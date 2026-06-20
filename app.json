@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Pulse",
+    "slug": "pulse-bpm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android", "web"],
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.pulsebpm"
+    },
+    "android": {
+      "package": "com.yourname.pulsebpm"
+    },
+    "plugins": [],
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Pulse",
+      "shortName": "Pulse",
+      "description": "Keep your heartbeat alive"
+    }
+  }
+}
