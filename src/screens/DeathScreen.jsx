@@ -166,34 +166,26 @@ export default function DeathScreen({ navigation }) {
   };
 
   return (
-    <ScrollView
-      ref={screenRef}
-      contentContainerStyle={styles.container}
-      bounces={false}
-      collapsable={false}
-    >
+    <View ref={screenRef} style={styles.container} collapsable={false}>
 
-      {/* Heart image */}
-      <Image
-        source={require('../../Assets/Heart.png')}
-        style={[styles.heartImg, { tintColor: causeColor }]}
-        resizeMode="contain"
-      />
-
-      {/* Cause of death */}
-      <Text style={[styles.causeLabel, { color: causeColor }]}>
-        {causeLabel}
-      </Text>
-      <Text style={styles.causeSubtitle}>{causeDesc}</Text>
-
-      {/* Zone */}
-      <Text style={[styles.zoneBadge, { color: zone.color }]}>
-        {zone.label.toUpperCase()}
-      </Text>
+      {/* Header: heart + cause + zone */}
+      <View style={styles.header}>
+        <Image
+          source={require('../../Assets/Heart.png')}
+          style={[styles.heartImg, { tintColor: causeColor }]}
+          resizeMode="contain"
+        />
+        <Text style={[styles.causeLabel, { color: causeColor }]}>{causeLabel}</Text>
+        <Text style={styles.causeSubtitle}>
+          {causeDesc}
+          {'  ·  '}
+          <Text style={{ color: zone.color }}>{zone.label.toUpperCase()}</Text>
+        </Text>
+      </View>
 
       {/* ECG waveform */}
       <View style={styles.svgContainer}>
-        <SvgXml xml={svgString} width="100%" height={200} />
+        <SvgXml xml={svgString} width="100%" height="100%" />
       </View>
 
       {/* Grade + Score */}
@@ -217,19 +209,20 @@ export default function DeathScreen({ navigation }) {
         <Stat label="DODGED" value={`${ringsDodged}`} />
       </View>
 
-      {/* Actions */}
-      <TouchableOpacity
-        style={[styles.btn, styles.btnPrimary, { borderColor: zone.color }]}
-        onPress={handleRestart}
-      >
-        <Text style={[styles.btnText, { color: zone.color }]}>TRY AGAIN</Text>
-      </TouchableOpacity>
+      {/* Actions — side by side */}
+      <View style={styles.btnRow}>
+        <TouchableOpacity
+          style={[styles.btn, styles.btnPrimary, { borderColor: zone.color }]}
+          onPress={handleRestart}
+        >
+          <Text style={[styles.btnText, { color: zone.color }]}>TRY AGAIN</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={handleShare}>
+          <Text style={styles.btnTextSecondary}>SHARE</Text>
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity style={[styles.btn, styles.btnSecondary]} onPress={handleShare}>
-        <Text style={styles.btnTextSecondary}>SHARE RUN</Text>
-      </TouchableOpacity>
-
-    </ScrollView>
+    </View>
   );
 }
 
@@ -244,53 +237,55 @@ function Stat({ label, value, accent }) {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1, backgroundColor: '#000',
+    flex: 1, backgroundColor: '#000',
     alignItems: 'center',
-    paddingTop: 80, paddingBottom: 60, paddingHorizontal: 20,
+    paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20,
+  },
+  header: {
+    alignItems: 'center', marginBottom: 12,
+  },
+  heartImg: {
+    width: 28, height: 28, opacity: 0.5, marginBottom: 6,
   },
   causeLabel: {
-    fontSize: 42, fontWeight: '100', letterSpacing: 10, marginBottom: 6,
+    fontSize: 34, fontWeight: '100', letterSpacing: 8, marginBottom: 4,
   },
   causeSubtitle: {
-    color: '#333', fontSize: 12, letterSpacing: 3, marginBottom: 16,
-  },
-  zoneBadge: {
-    fontSize: 11, letterSpacing: 4, marginBottom: 32,
+    color: '#333', fontSize: 11, letterSpacing: 2,
   },
   svgContainer: {
-    width: '100%', height: 200,
+    width: '100%', height: 120,
     borderWidth: 1, borderColor: '#111',
-    marginBottom: 32, borderRadius: 4, overflow: 'hidden',
+    marginBottom: 14, borderRadius: 4, overflow: 'hidden',
   },
   gradeRow: {
     flexDirection: 'row', alignItems: 'center',
-    width: '100%', marginBottom: 36, paddingHorizontal: 8,
+    width: '100%', marginBottom: 14, paddingHorizontal: 8,
   },
   gradeLetter: {
-    fontSize: 80, fontWeight: '100', lineHeight: 88,
-    marginRight: 24,
+    fontSize: 72, fontWeight: '100', lineHeight: 80,
+    marginRight: 20,
   },
   gradeInfo: { justifyContent: 'center' },
   scoreDisplay: {
-    fontSize: 32, fontWeight: '200', letterSpacing: 1,
+    fontSize: 28, fontWeight: '200', letterSpacing: 1,
   },
   bestLabel: { fontSize: 10, letterSpacing: 3, marginTop: 4 },
   statsRow: {
     flexDirection: 'row', justifyContent: 'space-around',
-    width: '100%', marginBottom: 48,
+    width: '100%', marginBottom: 20,
   },
   stat:       { alignItems: 'center' },
-  statValue:  { color: '#fff', fontSize: 22, fontWeight: '300', letterSpacing: 1 },
+  statValue:  { color: '#fff', fontSize: 18, fontWeight: '300', letterSpacing: 1 },
   statLabel:  { color: '#444', fontSize: 10, letterSpacing: 3, marginTop: 4 },
+  btnRow: {
+    flexDirection: 'row', gap: 12, width: '100%',
+  },
   btn: {
-    width: '80%', paddingVertical: 16, borderRadius: 2,
-    alignItems: 'center', marginBottom: 16,
+    flex: 1, paddingVertical: 14, borderRadius: 2, alignItems: 'center',
   },
   btnPrimary:       { borderWidth: 1 },
   btnSecondary:     { borderWidth: 1, borderColor: '#222' },
-  btnText:          { fontSize: 14, letterSpacing: 4, fontWeight: '300' },
-  btnTextSecondary: { color: '#444', fontSize: 14, letterSpacing: 4, fontWeight: '300' },
-  heartImg: {
-    width: 52, height: 52, opacity: 0.5, marginBottom: 20,
-  },
+  btnText:          { fontSize: 12, letterSpacing: 4, fontWeight: '300' },
+  btnTextSecondary: { color: '#444', fontSize: 12, letterSpacing: 4, fontWeight: '300' },
 });

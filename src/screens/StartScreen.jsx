@@ -12,7 +12,7 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, TouchableWithoutFeedback, TouchableOpacity, StyleSheet, Animated,
+  View, Text, TouchableWithoutFeedback, TouchableOpacity, StyleSheet, Animated, Image,
 } from 'react-native';
 import * as Haptics from '../utils/haptics';
 import { loadHeartbeat, playHeartbeat } from '../utils/sound';
@@ -247,6 +247,15 @@ export default function StartScreen({ navigation }) {
             : 'find the steady pace'}
         </Text>
 
+        {/* Heart image — idle only */}
+        {uiState === 'idle' && (
+          <Image
+            source={require('../../Assets/Heart.png')}
+            style={styles.heartImg}
+            resizeMode="contain"
+          />
+        )}
+
         {/* Progress bar */}
         {uiState === 'tapping' && (
           <View style={styles.progressTrack}>
@@ -337,6 +346,9 @@ const styles = StyleSheet.create({
   },
   rangeHint: {
     color: '#777', fontSize: 11, letterSpacing: 3, marginTop: 12,
+  },
+  heartImg: {
+    width: 64, height: 64, opacity: 0.15, marginTop: 8,
   },
   skipBtn: {
     position: 'absolute', top: 52, right: 24,
