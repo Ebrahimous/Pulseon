@@ -227,25 +227,18 @@ export default function StartScreen({ navigation }) {
           )}
         </Animated.View>
 
-        {/* Status */}
-        <Text style={[styles.status, { color: bpmColor }]}>
-          {isLocked
-            ? 'LOCKED'
-            : tooFast ? 'TOO FAST'
-            : tooSlow  ? 'TOO SLOW'
-            : inRange  ? 'IN RANGE'
-            : 'TAP THE BEAT'}
-        </Text>
+        {/* Status — hidden in idle (taglines already explain it) */}
+        {uiState !== 'idle' && (
+          <Text style={[styles.status, { color: bpmColor }]}>
+            {isLocked ? 'LOCKED' : tooFast ? 'TOO FAST' : tooSlow ? 'TOO SLOW' : 'IN RANGE'}
+          </Text>
+        )}
 
-        <Text style={styles.sub}>
-          {isLocked
-            ? ''
-            : uiState === 'idle'
-            ? `tap at ${BPM_NORMAL_LOW}–${BPM_NORMAL_HIGH} BPM for 3 seconds`
-            : inRange
-            ? 'hold the rhythm...'
-            : 'find the steady pace'}
-        </Text>
+        {uiState !== 'idle' && (
+          <Text style={styles.sub}>
+            {isLocked ? '' : inRange ? 'hold the rhythm...' : 'find the steady pace'}
+          </Text>
+        )}
 
         {/* Heart image — idle only */}
         {uiState === 'idle' && (
