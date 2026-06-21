@@ -10,6 +10,7 @@ import { registerRootComponent } from 'expo';
 import StartScreen from './src/screens/StartScreen';
 import GameScreen from './src/screens/GameScreen';
 import DeathScreen from './src/screens/DeathScreen';
+import HowToPlayScreen from './src/screens/HowToPlayScreen';
 import { useGameStore } from './src/store/gameStore';
 
 const Stack = createNativeStackNavigator();
@@ -48,9 +49,10 @@ function App() {
             contentStyle: { backgroundColor: '#000' },
           }}
         >
-          <Stack.Screen name="Start" component={StartScreen} />
-          <Stack.Screen name="Game"  component={GameScreen} />
-          <Stack.Screen name="Death" component={DeathScreen} />
+          <Stack.Screen name="Start"     component={StartScreen} />
+          <Stack.Screen name="Game"      component={GameScreen} />
+          <Stack.Screen name="Death"     component={DeathScreen} />
+          <Stack.Screen name="HowToPlay" component={HowToPlayScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>

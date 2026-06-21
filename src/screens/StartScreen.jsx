@@ -169,12 +169,26 @@ export default function StartScreen({ navigation }) {
           <Text style={styles.skipText}>SKIP</Text>
         </TouchableOpacity>
 
-        {/* Instructions — only in idle */}
+        {/* Taglines — only in idle */}
         {uiState === 'idle' && (
-          <View style={styles.instructions}>
-            <InstrLine text="Tap to control your BPM" />
-            <InstrLine text="Dodge the rings" />
-            <InstrLine text="Survive" />
+          <View style={styles.taglineBlock}>
+            <Text style={styles.tagline}>
+              <Text style={styles.tagEmphasis}>TAP</Text>
+              <Text style={styles.tagDim}> wait </Text>
+              <Text style={styles.tagEmphasis}>TAP</Text>
+              {'\n'}
+              <Text style={styles.tagSmall}>as a heart beats</Text>
+            </Text>
+            <Text style={styles.tagline2}>
+              {'Do '}
+              <Text style={styles.tagEmphasis}>NOT</Text>
+              {' let the\n'}
+              <Text style={styles.tagEmphasis}>RINGS</Text>
+              {' touch you'}
+            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('HowToPlay')}>
+              <Text style={styles.howToPlayBtn}>HOW TO PLAY</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -248,14 +262,6 @@ export default function StartScreen({ navigation }) {
   );
 }
 
-function InstrLine({ text }) {
-  return (
-    <View style={styles.instrRow}>
-      <Text style={styles.instrBullet}>—</Text>
-      <Text style={styles.instrText}>{text}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -263,20 +269,29 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  instructions: {
-    position: 'absolute', top: '10%', left: 32, right: 32,
+  taglineBlock: {
+    position: 'absolute', top: '8%', left: 28, right: 28,
+    gap: 28,
   },
-  instrTitle: {
-    color: '#888', fontSize: 10, letterSpacing: 4, marginBottom: 16,
+  tagline: {
+    color: '#fff', fontSize: 28, fontWeight: '200',
+    lineHeight: 40, letterSpacing: 1,
   },
-  instrRow: {
-    flexDirection: 'row', marginBottom: 10, alignItems: 'flex-start',
+  tagline2: {
+    color: '#fff', fontSize: 28, fontWeight: '200',
+    lineHeight: 40, letterSpacing: 1,
   },
-  instrBullet: {
-    color: '#69FF47', fontSize: 13, marginRight: 10, lineHeight: 18,
+  tagEmphasis: {
+    color: '#69FF47', fontWeight: '400',
   },
-  instrText: {
-    color: '#999', fontSize: 13, lineHeight: 18, flex: 1,
+  tagDim: {
+    color: '#444',
+  },
+  tagSmall: {
+    color: '#555', fontSize: 14, fontWeight: '300',
+  },
+  howToPlayBtn: {
+    color: '#333', fontSize: 10, letterSpacing: 4, marginTop: 8,
   },
   tapWord: {
     color: '#AAAAAA', fontSize: 13, letterSpacing: 10,

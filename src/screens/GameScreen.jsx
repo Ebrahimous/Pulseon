@@ -152,11 +152,12 @@ export default function GameScreen({ navigation }) {
   // ── Game loop ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (phase !== PHASE.PLAYING) return;
+    let rafId = null;
     const lastFrame = { t: Date.now() };
 
-    const id = setInterval(() => {
+    const tick = () => {
       const now   = Date.now();
-      const delta = now - lastFrame.t;
+      const delta = Math.min(now - lastFrame.t, 100); // cap to avoid spiral after tab-switch
       lastFrame.t = now;
 
       tickRings(delta);
@@ -170,7 +171,7 @@ export default function GameScreen({ navigation }) {
       setRipples(r => r.length ? r.filter(rp => now - rp.t < RIPPLE_LIFETIME) : r);
       setFloats(f  => f.length ? f.filter(fl => now - fl.t < FLOAT_LIFETIME)  : f);
 
-      // Collision — runs before phase check so markRingHit's DYING is caught below
+      // Collision
       const { playerX: px, playerY: py, rings: cur } = useGameStore.getState();
       const { hit, hitRingId, nearMissIds } = checkAllRings(cur, px, py);
 
@@ -178,29 +179,29 @@ export default function GameScreen({ navigation }) {
         lastHitTimeRef.current = now;
         useGameStore.getState().markRingHit(hitRingId);
       } else if (!hit && nearMissIds.length > 0 && now - lastNearMissTimeRef.current > NEAR_MISS_COOLDOWN_MS) {
-        // Near miss — adrenaline spike
         lastNearMissTimeRef.current = now;
         useGameStore.getState().applyNearMissScare();
       }
 
-      // Phase check — AFTER all state mutations
+      // Phase check
       const { phase: p, bestScore: bs } = useGameStore.getState();
       if ((p === PHASE.DYING || p === PHASE.DEAD) && !deathTriggered.current) {
         deathTriggered.current = true;
         engineRef.current?.stop();
-
-        // Persist best score at end of run
         savePersisted({ bestScore: bs }).catch(() => {});
-
         setShowFlatline(true);
         Animated.timing(flatlineAnim, {
           toValue: width, duration: 1100, useNativeDriver: false,
         }).start();
         setTimeout(() => navigation.replace('Death'), 1600);
+        return; // stop loop
       }
-    }, FRAME_MS);
 
-    return () => clearInterval(id);
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => { if (rafId) cancelAnimationFrame(rafId); };
   }, [phase]);
 
   // ── Dot pulse on ring spawn ──────────────────────────────────────────────
