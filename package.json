@@ -6,9 +6,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "deploy": "npx expo export -p web && wrangler deploy",
+    "preview": "npx expo export -p web && wrangler dev"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~4.0.0",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
     "expo": "~52.0.0",
@@ -22,6 +25,7 @@
     "expo-sharing": "~12.0.0",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-native": "0.76.5",
     "react-native-gesture-handler": "~2.20.0",
     "react-native-reanimated": "~3.16.0",
@@ -29,13 +33,12 @@
     "react-native-screens": "~4.4.0",
     "react-native-svg": "15.8.0",
     "react-native-view-shot": "^5.1.0",
-    "zustand": "^5.0.0",
-    "@expo/metro-runtime": "~4.0.0",
-    "react-dom": "18.3.1",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.0"
+    "@babel/core": "^7.25.0",
+    "wrangler": "^4.103.0"
   },
   "private": true
 }
