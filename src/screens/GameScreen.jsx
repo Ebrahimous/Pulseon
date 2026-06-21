@@ -259,6 +259,9 @@ export default function GameScreen({ navigation }) {
     return () => shakeLoopRef.current?.stop();
   }, [isRecord]);
 
+  // ── Derived (needed before effects that reference them) ──────────────────
+  const isBeatingBest = bestScore > 10 && score >= bestScore;
+
   // ── Score pop every time score increases ─────────────────────────────────
   useEffect(() => {
     if (score > prevScoreRef.current) {
@@ -368,7 +371,6 @@ export default function GameScreen({ navigation }) {
   const comboGlow  = isRecord ? 20 : 0;
   const now        = Date.now();
 
-  const isBeatingBest  = bestScore > 10 && score >= bestScore;
   const bestScoreLabel = bestScore > 10 ? Math.floor(bestScore).toLocaleString() : null;
   const scoreGlowColor = isBeatingBest ? '#FFD700' : accentColor;
   const scoreGlowSize  = isBeatingBest ? 18 : 8;
