@@ -172,11 +172,9 @@ export default function StartScreen({ navigation }) {
         {/* Instructions — only in idle */}
         {uiState === 'idle' && (
           <View style={styles.instructions}>
-            <Text style={styles.instrTitle}>HOW TO PLAY</Text>
-            <InstrLine text="Tap to keep your heartbeat in the 65–85 BPM range" />
-            <InstrLine text="Too fast causes a stroke — too slow causes flatline" />
-            <InstrLine text="Avoid rings — each hit costs a life. Three hits and your heart stops" />
-            <InstrLine text="Survive as long as possible" />
+            <InstrLine text="Tap to control your BPM" />
+            <InstrLine text="Dodge the rings" />
+            <InstrLine text="Survive" />
           </View>
         )}
 
