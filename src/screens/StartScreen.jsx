@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     top: '60%',
     width: 200, height: 200, opacity: 0.94,
-    tintColor: '#FF1744',
+    tintColor: '#6B0000',
   },
   skipBtn: {
     position: 'absolute', top: 52, right: 24,
