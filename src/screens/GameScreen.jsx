@@ -418,6 +418,7 @@ export default function GameScreen({ navigation }) {
           left: width / 2 - 100,
           top:  height / 2 - 100,
           opacity: 0.65,
+          tintColor: '#6B0000',
           transform: [{ scale: heartPulse }],
         }}
         resizeMode="contain"
