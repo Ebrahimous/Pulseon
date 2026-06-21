@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     color: '#777', fontSize: 11, letterSpacing: 3, marginTop: 12,
   },
   heartImg: {
-    width: 160, height: 160, opacity: 0.75, marginTop: 8,
+    width: 200, height: 200, opacity: 0.85, marginTop: 8,
   },
   skipBtn: {
     position: 'absolute', top: 52, right: 24,

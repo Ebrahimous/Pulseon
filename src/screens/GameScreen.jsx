@@ -414,10 +414,10 @@ export default function GameScreen({ navigation }) {
         pointerEvents="none"
         style={{
           position: 'absolute',
-          width: 160, height: 160,
-          left: width / 2 - 80,
-          top:  height / 2 - 80,
-          opacity: 0.18,
+          width: 200, height: 200,
+          left: width / 2 - 100,
+          top:  height / 2 - 100,
+          opacity: 0.65,
           transform: [{ scale: heartPulse }],
         }}
         resizeMode="contain"
