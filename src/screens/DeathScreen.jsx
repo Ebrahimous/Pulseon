@@ -55,10 +55,10 @@ export default function DeathScreen({ navigation }) {
   const scoreLabel    = Math.floor(score).toLocaleString();
 
   const handleShare = async () => {
-    // Web: draw result card to canvas and share as PNG
+    // Web: pure canvas draw (no external images → no tainted-canvas errors)
     if (Platform.OS === 'web') {
       try {
-        const W = 390, H = 580;
+        const W = 390, H = 520;
         const canvas = document.createElement('canvas');
         canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d');
@@ -67,75 +67,95 @@ export default function DeathScreen({ navigation }) {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
 
-        // Title
-        ctx.fillStyle = '#1a1a1a';
+        // Branding
+        ctx.fillStyle = '#181818';
         ctx.font = '11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('P U L S E', W / 2, 36);
+        ctx.fillText('P U L S E', W / 2, 38);
 
         // Cause of death
         ctx.fillStyle = causeColor;
-        ctx.font = '300 16px monospace';
-        ctx.fillText(causeLabel.toUpperCase(), W / 2, 72);
+        ctx.font = '18px monospace';
+        ctx.fillText(causeLabel, W / 2, 74);
 
-        // ECG waveform
-        await new Promise((res) => {
-          const img = new Image();
-          const blob = new Blob([svgString], { type: 'image/svg+xml' });
-          const url = URL.createObjectURL(blob);
-          img.onload = () => { ctx.drawImage(img, 0, 90, W, 160); URL.revokeObjectURL(url); res(); };
-          img.onerror = res;
-          img.src = url;
-        });
+        // BPM history line (drawn directly — no SVG, no taint risk)
+        if (ecgHistory && ecgHistory.length >= 2) {
+          const PAD = 32;
+          const graphW = W - PAD * 2;
+          const graphH = 120;
+          const graphY = 100;
+          const tStart = ecgHistory[0].t;
+          const tRange = Math.max(ecgHistory[ecgHistory.length - 1].t - tStart, 1);
+          ctx.strokeStyle = zone.color + '55';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ecgHistory.forEach((p, i) => {
+            const x = PAD + ((p.t - tStart) / tRange) * graphW;
+            const norm = Math.max(0, Math.min(1, (p.bpm - 40) / 120));
+            const y = graphY + graphH - norm * graphH;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          // Baseline
+          ctx.strokeStyle = '#111';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(PAD, graphY + graphH + 4);
+          ctx.lineTo(W - PAD, graphY + graphH + 4);
+          ctx.stroke();
+        }
 
         // Grade
         ctx.fillStyle = gradeColor;
-        ctx.font = '100 88px sans-serif';
+        ctx.font = '80px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(grade, 28, 340);
+        ctx.fillText(grade, 32, 360);
 
         // Score
         ctx.fillStyle = gradeColor;
-        ctx.font = '300 38px sans-serif';
+        ctx.font = '34px sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(scoreLabel, W - 28, 316);
+        ctx.fillText(scoreLabel, W - 32, 334);
 
         // Stats
-        ctx.fillStyle = '#444';
-        ctx.font = '300 11px monospace';
+        ctx.fillStyle = '#555';
+        ctx.font = '11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${survivalLabel}  ·  ×${bestCombo} COMBO  ·  ${ringsDodged} DODGED`, W / 2, 390);
-
-        // Divider
-        ctx.strokeStyle = '#111';
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(28, 410); ctx.lineTo(W - 28, 410); ctx.stroke();
+        ctx.fillText(`${survivalLabel}  ·  ×${bestCombo}  ·  ${ringsDodged} rings`, W / 2, 410);
 
         // Zone
         ctx.fillStyle = zone.color;
-        ctx.font = '300 10px monospace';
-        ctx.textAlign = 'center';
+        ctx.font = '10px monospace';
         ctx.fillText(zone.label.toUpperCase(), W / 2, 440);
 
-        // URL
-        ctx.fillStyle = '#1a1a1a';
-        ctx.font = '300 10px monospace';
-        ctx.fillText(window.location.hostname, W / 2, 550);
+        // Footer
+        ctx.fillStyle = '#181818';
+        ctx.fillText(window.location.hostname, W / 2, 505);
 
-        // Share or download
-        canvas.toBlob(async (blob) => {
-          const file = new File([blob], 'pulse_run.png', { type: 'image/png' });
-          if (navigator.share && navigator.canShare?.({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'Pulse' });
-          } else {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'pulse_run.png';
-            a.click();
-          }
-        }, 'image/png');
+        // toDataURL is synchronous and safe (no external images loaded)
+        const dataUrl = canvas.toDataURL('image/png');
+        const fetchRes = await fetch(dataUrl);
+        const blob = await fetchRes.blob();
+        const file = new File([blob], 'pulse_run.png', { type: 'image/png' });
+
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Pulse' });
+        } else {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'pulse_run.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
       } catch (e) {
-        console.error('Web share error', e);
+        // Last-resort: copy text to clipboard
+        const text = `Pulse · ${causeLabel} · Grade ${grade} · ${scoreLabel} pts · ${survivalLabel}`;
+        try {
+          await navigator.clipboard.writeText(text);
+          Alert.alert('Copied', 'Result copied to clipboard.');
+        } catch {}
+        console.error('Share error', e);
       }
       return;
     }
@@ -287,5 +307,8 @@ const styles = StyleSheet.create({
   btnPrimary:       { borderWidth: 1 },
   btnSecondary:     { borderWidth: 1, borderColor: '#222' },
   btnText:          { fontSize: 12, letterSpacing: 4, fontWeight: '300' },
-  btnTextSecondary: { color: '#444', fontSize: 12, letterSpacing: 4, fontWeight: '300' },
+  btnTextSecondary: { color: '#888', fontSize: 12, letterSpacing: 4, fontWeight: '300' },
+  heartImg: {
+    width: 64, height: 64, opacity: 0.6, marginBottom: 8,
+  },
 });

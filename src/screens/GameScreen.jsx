@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import { Animated, View, Text, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, {
   Circle, Polyline, Rect, Line,
   Defs, RadialGradient, Stop, Pattern,
@@ -121,6 +121,9 @@ export default function GameScreen({ navigation }) {
 
   // ── Dot jump on tap ──────────────────────────────────────────────────────
   const jumpAnim = useRef(new Animated.Value(0)).current;
+
+  // ── Heart pulse on tap ───────────────────────────────────────────────────
+  const heartPulse = useRef(new Animated.Value(1)).current;
 
   // ── Warning pulse (border flash when near death) ──────────────────────────
   const warnPulse    = useRef(new Animated.Value(0)).current;
@@ -338,6 +341,13 @@ export default function GameScreen({ navigation }) {
       playHeartbeat();
       registerTap(e.x, e.y);
 
+      // Heart pulse
+      heartPulse.stopAnimation();
+      Animated.sequence([
+        Animated.timing(heartPulse, { toValue: 1.28, duration: 80,  useNativeDriver: true }),
+        Animated.timing(heartPulse, { toValue: 1.0,  duration: 320, useNativeDriver: true }),
+      ]).start();
+
       // Dot jump
       jumpAnim.stopAnimation();
       jumpAnim.setValue(0);
@@ -397,6 +407,21 @@ export default function GameScreen({ navigation }) {
 
       {/* Scanlines */}
       <Scanlines width={width} height={height} />
+
+      {/* Pulsing heart — centred, beats with each tap */}
+      <Animated.Image
+        source={require('../../Assets/Heart.png')}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: 160, height: 160,
+          left: width / 2 - 80,
+          top:  height / 2 - 80,
+          opacity: 0.06,
+          transform: [{ scale: heartPulse }],
+        }}
+        resizeMode="contain"
+      />
 
       {/* Score — top center */}
       <Animated.View
