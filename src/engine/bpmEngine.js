@@ -28,13 +28,16 @@ export function createBpmEngine({ getStore, screenWidth, screenHeight, onBeat: o
 
   function onBeat() {
     const store = getStore();
-    const { phase, displayBpm } = store;
+    const { phase, displayBpm, score } = store;
     if (phase !== 'playing') return;
 
     beatCount++;
 
-    // Spawn ring every N beats
-    if (beatCount % spawnEveryN(displayBpm) === 0) {
+    // Progressive ring frequency: increases with score (caps at 3× base rate)
+    const freqMult     = Math.min(3.0, 1.0 + score / 500);
+    const beatsPerSpawn = Math.max(1, Math.round(spawnEveryN(displayBpm) / freqMult));
+
+    if (beatCount % beatsPerSpawn === 0) {
       store.spawnRing(screenWidth, screenHeight);
     }
 

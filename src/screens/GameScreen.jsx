@@ -6,6 +6,7 @@ import Svg, {
 } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from '../utils/haptics';
+import { playHeartbeat } from '../utils/sound';
 import {
   useGameStore, PHASE,
 } from '../store/gameStore';
@@ -334,6 +335,7 @@ export default function GameScreen({ navigation }) {
   const tapGesture = Gesture.Pan()
     .runOnJS(true)
     .onBegin((e) => {
+      playHeartbeat();
       registerTap(e.x, e.y);
 
       // Dot jump

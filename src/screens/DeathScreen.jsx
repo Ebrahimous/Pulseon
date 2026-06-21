@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { Platform } from 'react-native';
@@ -55,17 +55,88 @@ export default function DeathScreen({ navigation }) {
   const scoreLabel    = Math.floor(score).toLocaleString();
 
   const handleShare = async () => {
-    // Web: use navigator.share with text summary
+    // Web: draw result card to canvas and share as PNG
     if (Platform.OS === 'web') {
-      const text = `I scored ${scoreLabel} (Grade ${grade}) in Pulse!\n${survivalLabel} survived · ×${bestCombo} best combo · ${ringsDodged} rings dodged`;
       try {
-        if (navigator.share) {
-          await navigator.share({ title: 'Pulse', text });
-        } else {
-          await navigator.clipboard.writeText(text);
-          Alert.alert('Copied!', 'Result copied to clipboard.');
-        }
-      } catch {}
+        const W = 390, H = 580;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+
+        // Title
+        ctx.fillStyle = '#1a1a1a';
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('P U L S E', W / 2, 36);
+
+        // Cause of death
+        ctx.fillStyle = causeColor;
+        ctx.font = '300 16px monospace';
+        ctx.fillText(causeLabel.toUpperCase(), W / 2, 72);
+
+        // ECG waveform
+        await new Promise((res) => {
+          const img = new Image();
+          const blob = new Blob([svgString], { type: 'image/svg+xml' });
+          const url = URL.createObjectURL(blob);
+          img.onload = () => { ctx.drawImage(img, 0, 90, W, 160); URL.revokeObjectURL(url); res(); };
+          img.onerror = res;
+          img.src = url;
+        });
+
+        // Grade
+        ctx.fillStyle = gradeColor;
+        ctx.font = '100 88px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(grade, 28, 340);
+
+        // Score
+        ctx.fillStyle = gradeColor;
+        ctx.font = '300 38px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(scoreLabel, W - 28, 316);
+
+        // Stats
+        ctx.fillStyle = '#444';
+        ctx.font = '300 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${survivalLabel}  ·  ×${bestCombo} COMBO  ·  ${ringsDodged} DODGED`, W / 2, 390);
+
+        // Divider
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(28, 410); ctx.lineTo(W - 28, 410); ctx.stroke();
+
+        // Zone
+        ctx.fillStyle = zone.color;
+        ctx.font = '300 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(zone.label.toUpperCase(), W / 2, 440);
+
+        // URL
+        ctx.fillStyle = '#1a1a1a';
+        ctx.font = '300 10px monospace';
+        ctx.fillText(window.location.hostname, W / 2, 550);
+
+        // Share or download
+        canvas.toBlob(async (blob) => {
+          const file = new File([blob], 'pulse_run.png', { type: 'image/png' });
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Pulse' });
+          } else {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'pulse_run.png';
+            a.click();
+          }
+        }, 'image/png');
+      } catch (e) {
+        console.error('Web share error', e);
+      }
       return;
     }
 
@@ -101,6 +172,13 @@ export default function DeathScreen({ navigation }) {
       bounces={false}
       collapsable={false}
     >
+
+      {/* Heart image */}
+      <Image
+        source={require('../../Assets/Heart.png')}
+        style={[styles.heartImg, { tintColor: causeColor }]}
+        resizeMode="contain"
+      />
 
       {/* Cause of death */}
       <Text style={[styles.causeLabel, { color: causeColor }]}>
@@ -212,4 +290,7 @@ const styles = StyleSheet.create({
   btnSecondary:     { borderWidth: 1, borderColor: '#222' },
   btnText:          { fontSize: 14, letterSpacing: 4, fontWeight: '300' },
   btnTextSecondary: { color: '#444', fontSize: 14, letterSpacing: 4, fontWeight: '300' },
+  heartImg: {
+    width: 52, height: 52, opacity: 0.5, marginBottom: 20,
+  },
 });

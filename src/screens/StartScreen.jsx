@@ -15,6 +15,7 @@ import {
   View, Text, TouchableWithoutFeedback, TouchableOpacity, StyleSheet, Animated,
 } from 'react-native';
 import * as Haptics from '../utils/haptics';
+import { loadHeartbeat, playHeartbeat } from '../utils/sound';
 import { useGameStore, PHASE, BPM_NORMAL_LOW, BPM_NORMAL_HIGH } from '../store/gameStore';
 
 const IN_RANGE_REQUIRED_MS = 3000;
@@ -22,6 +23,9 @@ const TAP_WINDOW = 6;
 
 export default function StartScreen({ navigation }) {
   const { setPhase, resetGame } = useGameStore();
+
+  // Preload heartbeat sound
+  useEffect(() => { loadHeartbeat(); }, []);
 
   const [uiState, setUiState]   = useState('idle');   // idle | tapping | locked
   const [liveBpm, setLiveBpm]   = useState(null);
@@ -85,6 +89,7 @@ export default function StartScreen({ navigation }) {
 
   const handleTap = useCallback((e) => {
     const now = Date.now();
+    playHeartbeat();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     flashPulse();
 
@@ -203,11 +208,11 @@ export default function StartScreen({ navigation }) {
           </Animated.Text>
         )}
 
-        {/* Pulsing circle with BPM centred inside */}
+        {/* Pulsing circle with BPM centred inside — hidden until tapping */}
         <Animated.View
           style={[
             styles.circleWrap,
-            { transform: [{ scale: pulseAnim }] },
+            { transform: [{ scale: pulseAnim }], opacity: uiState === 'idle' ? 0 : 1 },
           ]}
         >
           <View style={[
@@ -272,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   taglineBlock: {
-    position: 'absolute', top: '12%', left: 28, right: 28,
+    position: 'absolute', top: '22%', left: 28, right: 28,
     gap: 28, alignItems: 'center',
   },
   tagline: {
@@ -297,6 +302,7 @@ const styles = StyleSheet.create({
   },
   tapWord: {
     color: '#AAAAAA', fontSize: 13, letterSpacing: 10,
+    paddingLeft: 10,   // compensate trailing letter-spacing so text is optically centred
     marginBottom: 20, fontWeight: '300',
   },
   circleWrap: {
