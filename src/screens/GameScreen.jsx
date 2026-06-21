@@ -417,7 +417,7 @@ export default function GameScreen({ navigation }) {
           width: 160, height: 160,
           left: width / 2 - 80,
           top:  height / 2 - 80,
-          opacity: 0.06,
+          opacity: 0.18,
           transform: [{ scale: heartPulse }],
         }}
         resizeMode="contain"
