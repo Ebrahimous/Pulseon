@@ -164,6 +164,11 @@ export default function StartScreen({ navigation }) {
     <TouchableWithoutFeedback onPress={handleTap}>
       <View style={styles.container}>
 
+        {/* How to play — top left */}
+        <TouchableOpacity style={styles.howToPlayBtn} onPress={() => navigation.navigate('HowToPlay')}>
+          <Text style={styles.howToPlayText}>HOW TO PLAY</Text>
+        </TouchableOpacity>
+
         {/* Skip button — top right */}
         <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
           <Text style={styles.skipText}>SKIP</Text>
@@ -179,16 +184,13 @@ export default function StartScreen({ navigation }) {
               {'\n'}
               <Text style={styles.tagSmall}>as a heart beats</Text>
             </Text>
-            <Text style={styles.tagline2}>
+            <Text style={styles.tagline}>
               {'Do '}
               <Text style={styles.tagEmphasis}>NOT</Text>
               {' let the\n'}
               <Text style={styles.tagEmphasis}>RINGS</Text>
               {' touch you'}
             </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('HowToPlay')}>
-              <Text style={styles.howToPlayBtn}>HOW TO PLAY</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -270,16 +272,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   taglineBlock: {
-    position: 'absolute', top: '8%', left: 28, right: 28,
-    gap: 28,
+    position: 'absolute', top: '12%', left: 28, right: 28,
+    gap: 28, alignItems: 'center',
   },
   tagline: {
     color: '#fff', fontSize: 28, fontWeight: '200',
-    lineHeight: 40, letterSpacing: 1,
-  },
-  tagline2: {
-    color: '#fff', fontSize: 28, fontWeight: '200',
-    lineHeight: 40, letterSpacing: 1,
+    lineHeight: 40, letterSpacing: 1, textAlign: 'center',
   },
   tagEmphasis: {
     color: '#69FF47', fontWeight: '400',
@@ -291,7 +289,11 @@ const styles = StyleSheet.create({
     color: '#555', fontSize: 14, fontWeight: '300',
   },
   howToPlayBtn: {
-    color: '#333', fontSize: 10, letterSpacing: 4, marginTop: 8,
+    position: 'absolute', top: 52, left: 24,
+    paddingVertical: 6, paddingHorizontal: 4,
+  },
+  howToPlayText: {
+    color: '#2a2a2a', fontSize: 11, letterSpacing: 4,
   },
   tapWord: {
     color: '#AAAAAA', fontSize: 13, letterSpacing: 10,

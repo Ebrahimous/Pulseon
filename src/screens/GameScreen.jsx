@@ -57,7 +57,10 @@ function Scanlines({ width, height }) {
 }
 
 export default function GameScreen({ navigation }) {
-  const { width, height } = useWindowDimensions();
+  const { width: winW, height: winH } = useWindowDimensions();
+  const [containerDims, setContainerDims] = useState({ width: 0, height: 0 });
+  const width  = containerDims.width  || winW;
+  const height = containerDims.height || winH;
 
   const {
     phase, displayBpm, rings, playerX, playerY, accentColor, zone,
@@ -382,7 +385,13 @@ export default function GameScreen({ navigation }) {
                       : 'STROKE';
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={e => {
+        const { width: w, height: h } = e.nativeEvent.layout;
+        if (w > 0 && h > 0) setContainerDims({ width: w, height: h });
+      }}
+    >
 
       {/* Scanlines */}
       <Scanlines width={width} height={height} />

@@ -15,15 +15,15 @@ import { useGameStore } from './src/store/gameStore';
 
 const Stack = createNativeStackNavigator();
 
-const PHONE_W = 390;
-const PHONE_H = 844;
+const PHONE_ASPECT = 390 / 844;
 
 function WebFrame({ nav }) {
   const { width: vw, height: vh } = useWindowDimensions();
-  const scale = Math.min(1, (vh - 16) / PHONE_H, (vw - 16) / PHONE_W);
+  const frameH = Math.min(vh - 16, 844);
+  const frameW = Math.min(frameH * PHONE_ASPECT, vw - 16, 390);
   return (
     <View style={styles.webShell}>
-      <View style={[styles.phoneFrame, { transform: [{ scale }] }]}>
+      <View style={[styles.phoneFrame, { width: frameW, height: frameH }]}>
         {nav}
       </View>
     </View>
