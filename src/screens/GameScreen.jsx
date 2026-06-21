@@ -417,7 +417,7 @@ export default function GameScreen({ navigation }) {
           width: 200, height: 200,
           left: width / 2 - 100,
           top:  height / 2 - 100,
-          opacity: 0.65,
+          opacity: 0.55,
           tintColor: '#6B0000',
           transform: [{ scale: heartPulse }],
         }}
