@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { Platform, View, StyleSheet } from 'react-native';
+import { Platform, View, StyleSheet, useWindowDimensions } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +13,21 @@ import DeathScreen from './src/screens/DeathScreen';
 import { useGameStore } from './src/store/gameStore';
 
 const Stack = createNativeStackNavigator();
+
+const PHONE_W = 390;
+const PHONE_H = 844;
+
+function WebFrame({ nav }) {
+  const { width: vw, height: vh } = useWindowDimensions();
+  const scale = Math.min(1, (vh - 16) / PHONE_H, (vw - 16) / PHONE_W);
+  return (
+    <View style={styles.webShell}>
+      <View style={[styles.phoneFrame, { transform: [{ scale }] }]}>
+        {nav}
+      </View>
+    </View>
+  );
+}
 
 const isWeb = Platform.OS === 'web';
 
@@ -41,15 +56,9 @@ function App() {
     </GestureHandlerRootView>
   );
 
-  // On desktop web: center a phone-sized game window
+  // On desktop web: center a phone-sized game window, scaled to fit viewport
   if (isWeb) {
-    return (
-      <View style={styles.webShell}>
-        <View style={styles.phoneFrame}>
-          {nav}
-        </View>
-      </View>
-    );
+    return <WebFrame nav={nav} />;
   }
 
   return nav;
