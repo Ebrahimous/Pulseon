@@ -280,29 +280,35 @@ export const useGameStore = create((set, get) => ({
       dir         = 1;
     }
 
-    // Spawn origin off-screen so the ring sweeps in from an edge,
-    // giving the player time to react before it reaches them.
-    const EDGE_OFFSET = 40; // px beyond the screen boundary
-    let originX, originY;
-    const edge = Math.floor(Math.random() * 4); // 0=top 1=right 2=bottom 3=left
-    switch (edge) {
-      case 0:
-        originX = Math.random() * screenWidth;
-        originY = -EDGE_OFFSET;
-        break;
-      case 1:
-        originX = screenWidth + EDGE_OFFSET;
-        originY = Math.random() * screenHeight;
-        break;
-      case 2:
-        originX = Math.random() * screenWidth;
-        originY = screenHeight + EDGE_OFFSET;
-        break;
-      default:
-        originX = -EDGE_OFFSET;
-        originY = Math.random() * screenHeight;
-        break;
-    }
+    // Spawn origin off-screen with a safe-zone guarantee:
+    // retry until the origin is far enough from the player that they have
+    // meaningful reaction time. Safe distance scales up with ring speed.
+    const EDGE_OFFSET  = 40;
+    const MIN_DIST     = 200 + ringSpeedMult * 60; // ~260px at base, ~350px at max difficulty
+
+    let originX = 0, originY = 0, attempts = 0;
+    do {
+      const edge = Math.floor(Math.random() * 4);
+      switch (edge) {
+        case 0:
+          originX = Math.random() * screenWidth;
+          originY = -EDGE_OFFSET;
+          break;
+        case 1:
+          originX = screenWidth + EDGE_OFFSET;
+          originY = Math.random() * screenHeight;
+          break;
+        case 2:
+          originX = Math.random() * screenWidth;
+          originY = screenHeight + EDGE_OFFSET;
+          break;
+        default:
+          originX = -EDGE_OFFSET;
+          originY = Math.random() * screenHeight;
+          break;
+      }
+      attempts++;
+    } while (attempts < 12 && Math.hypot(originX - playerX, originY - playerY) < MIN_DIST);
 
     set((s) => ({
       spawnCount: s.spawnCount + 1,
