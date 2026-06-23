@@ -6,7 +6,7 @@ import Svg, {
 } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from '../utils/haptics';
-import { playHeartbeat } from '../utils/sound';
+import { playHeartbeat, playFlatline, playHit, playWhoosh } from '../utils/sound';
 import {
   useGameStore, PHASE,
 } from '../store/gameStore';
@@ -67,7 +67,7 @@ export default function GameScreen({ navigation }) {
     phase, displayBpm, rings, playerX, playerY, accentColor, zone,
     ecgHistory, strokeAccumMs, flatlineAccumMs,
     currentBpmLow, currentBpmHigh, spawnCount,
-    score, bestScore, combo, bestCombo, deathCause,
+    score, bestScore, combo, bestCombo, deathCause, difficultyLevel,
     registerTap, tickRings, tickSurvival, tickFlatline, tickStroke,
     tickDifficulty, tickBpmDecay, startGame, setPlayerPosition,
   } = useGameStore();
@@ -125,6 +125,17 @@ export default function GameScreen({ navigation }) {
   // ── Heart pulse on tap ───────────────────────────────────────────────────
   const heartPulse = useRef(new Animated.Value(1)).current;
 
+  // ── Near-miss flash ──────────────────────────────────────────────────────
+  const nearMissFlash = useRef(new Animated.Value(0)).current;
+
+  // ── Pause ─────────────────────────────────────────────────────────────────
+  const isPausedRef = useRef(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // ── Difficulty range announcement ────────────────────────────────────────
+  const diffAnnounceOpacity = useRef(new Animated.Value(0)).current;
+  const [diffAnnounceText, setDiffAnnounceText] = useState('');
+
   // ── Warning pulse (border flash when near death) ──────────────────────────
   const warnPulse    = useRef(new Animated.Value(0)).current;
   const warnLoopRef  = useRef(null);
@@ -163,7 +174,13 @@ export default function GameScreen({ navigation }) {
     const lastFrame = { t: Date.now() };
 
     const tick = () => {
-      const now   = Date.now();
+      const now = Date.now();
+      // While paused: keep the rAF alive but do nothing (reset lastFrame so delta doesn't spike on resume)
+      if (isPausedRef.current) {
+        lastFrame.t = now;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
       const delta = Math.min(now - lastFrame.t, 100); // cap to avoid spiral after tab-switch
       lastFrame.t = now;
 
@@ -188,14 +205,20 @@ export default function GameScreen({ navigation }) {
       } else if (!hit && nearMissIds.length > 0 && now - lastNearMissTimeRef.current > NEAR_MISS_COOLDOWN_MS) {
         lastNearMissTimeRef.current = now;
         useGameStore.getState().applyNearMissScare();
+        playWhoosh();
+        // Near-miss cyan flash
+        nearMissFlash.setValue(0.28);
+        Animated.timing(nearMissFlash, { toValue: 0, duration: 380, useNativeDriver: true }).start();
       }
 
       // Phase check
-      const { phase: p, bestScore: bs } = useGameStore.getState();
+      const { phase: p, bestScore: bs, survivalMs: sm } = useGameStore.getState();
       if ((p === PHASE.DYING || p === PHASE.DEAD) && !deathTriggered.current) {
         deathTriggered.current = true;
         engineRef.current?.stop();
-        savePersisted({ bestScore: bs }).catch(() => {});
+        playFlatline();
+        useGameStore.getState().recordRunResult(sm);
+        savePersisted({ bestScore: bs, ...useGameStore.getState().getStreakData() }).catch(() => {});
         setShowFlatline(true);
         Animated.timing(flatlineAnim, {
           toValue: width, duration: 1100, useNativeDriver: false,
@@ -249,6 +272,60 @@ export default function GameScreen({ navigation }) {
       Animated.timing(zoneAnnounceOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
     ]).start();
   }, [zone.id]);
+
+  // ── Difficulty range-narrow announcement ─────────────────────────────────
+  useEffect(() => {
+    if (difficultyLevel === 0) return;
+    setDiffAnnounceText(`RANGE  ${currentBpmLow}–${currentBpmHigh} BPM`);
+    diffAnnounceOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(diffAnnounceOpacity, { toValue: 1,   duration: 250, useNativeDriver: true }),
+      Animated.delay(1400),
+      Animated.timing(diffAnnounceOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
+    ]).start();
+  }, [difficultyLevel]);
+
+  // ── Pause on tab-switch / app background ─────────────────────────────────
+  useEffect(() => {
+    if (phase !== PHASE.PLAYING) return;
+
+    const doPause = () => {
+      if (isPausedRef.current) return;
+      isPausedRef.current = true;
+      setIsPaused(true);
+      engineRef.current?.stop();
+    };
+    const doResume = () => {
+      if (!isPausedRef.current) return;
+      // Reset lastTapMs so the flatline timer doesn't punish them for leaving
+      useGameStore.setState({ lastTapMs: Date.now() });
+      engineRef.current?.start();
+      isPausedRef.current = false;
+      setIsPaused(false);
+    };
+
+    // Web: Page Visibility API
+    const onVisChange = () => {
+      if (typeof document === 'undefined') return;
+      document.hidden ? doPause() : doResume();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisChange);
+    }
+
+    // Native: AppState
+    const { AppState } = require('react-native');
+    const appSub = AppState.addEventListener('change', (state) => {
+      state === 'active' ? doResume() : doPause();
+    });
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisChange);
+      }
+      appSub?.remove();
+    };
+  }, [phase]);
 
   // ── Combo shake ──────────────────────────────────────────────────────────
   const isRecord = bestCombo >= MIN_SHAKE_COMBO && combo >= bestCombo;
@@ -306,6 +383,7 @@ export default function GameScreen({ navigation }) {
   useEffect(() => {
     if (lives < prevLivesRef.current) {
       const lostIdx = lives; // e.g. lives just became 2 → heart at index 2 pops off
+      playHit();
 
       // Red screen flash
       damageFlash.setValue(0.45);
@@ -617,12 +695,26 @@ export default function GameScreen({ navigation }) {
         {zone.label.toUpperCase()}
       </Text>
 
+      {/* Near-miss flash */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#4FC3F7', opacity: nearMissFlash }]}
+      />
+
       {/* Zone announcement */}
       <Animated.Text
         style={[styles.zoneAnnounce, { color: zoneAnnounceColor, opacity: zoneAnnounceOpacity }]}
         pointerEvents="none"
       >
         {zoneAnnounceLabel}
+      </Animated.Text>
+
+      {/* Difficulty range-narrow announcement */}
+      <Animated.Text
+        style={[styles.zoneAnnounce, { color: '#FF6B6B', opacity: diffAnnounceOpacity, top: '42%' }]}
+        pointerEvents="none"
+      >
+        {diffAnnounceText}
       </Animated.Text>
 
       {/* +N floats */}
@@ -660,6 +752,14 @@ export default function GameScreen({ navigation }) {
           <Text style={[styles.flatlineLabel, { color: flatlineColor }]}>
             {flatlineLabel}
           </Text>
+        </View>
+      )}
+
+      {/* Pause overlay — shown when tab is hidden or app is backgrounded */}
+      {isPaused && (
+        <View style={styles.pauseOverlay} pointerEvents="none">
+          <Text style={styles.pauseLabel}>PAUSED</Text>
+          <Text style={styles.pauseSub}>return to continue</Text>
         </View>
       )}
 
@@ -769,5 +869,16 @@ const styles = StyleSheet.create({
   flatlineLabel: {
     position: 'absolute', alignSelf: 'center', top: '43%',
     fontSize: 26, fontWeight: '100', letterSpacing: 10,
+  },
+  pauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  pauseLabel: {
+    color: '#fff', fontSize: 28, fontWeight: '100', letterSpacing: 12,
+  },
+  pauseSub: {
+    color: '#444', fontSize: 11, letterSpacing: 4, marginTop: 12,
   },
 });

@@ -1,6 +1,6 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, Animated,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { Platform } from 'react-native';
@@ -26,9 +26,20 @@ const GRADE_COLOR = { S: '#FFD700', A: '#69FF47', B: '#4FC3F7', C: '#FFFFFF', D:
 export default function DeathScreen({ navigation }) {
   const screenRef = useRef(null);
 
+  // Heart entrance animation
+  const heartScale   = useRef(new Animated.Value(1.6)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(heartScale,   { toValue: 1.0, duration: 520, useNativeDriver: true }),
+      Animated.timing(heartOpacity, { toValue: 1.0, duration: 420, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   const {
     ecgHistory, score, bestScore, zone, peakBpm,
     survivalMs, bestCombo, deathCause, ringsDodged, resetGame,
+    runStreak, bestStreak,
   } = useGameStore();
 
   const isFlatline = deathCause === 'flatline';
@@ -190,9 +201,9 @@ export default function DeathScreen({ navigation }) {
 
       {/* Header: heart + cause + zone */}
       <View style={styles.header}>
-        <Image
+        <Animated.Image
           source={require('../../Assets/Heart.png')}
-          style={[styles.heartImg, { tintColor: causeColor }]}
+          style={[styles.heartImg, { tintColor: causeColor, transform: [{ scale: heartScale }], opacity: heartOpacity }]}
           resizeMode="contain"
         />
         <Text style={[styles.causeLabel, { color: causeColor }]}>{causeLabel}</Text>
@@ -228,6 +239,20 @@ export default function DeathScreen({ navigation }) {
         <Stat label="COMBO"  value={`×${bestCombo}`} accent={zone.color} />
         <Stat label="DODGED" value={`${ringsDodged}`} />
       </View>
+
+      {/* Streak */}
+      {(runStreak > 1 || bestStreak > 1) && (
+        <View style={styles.streakRow}>
+          {runStreak > 0 && (
+            <Text style={[styles.streakText, runStreak >= 3 && { color: '#FFD700' }]}>
+              {runStreak}  RUN STREAK
+            </Text>
+          )}
+          {bestStreak > runStreak && bestStreak > 1 && (
+            <Text style={styles.streakBest}>BEST  {bestStreak}</Text>
+          )}
+        </View>
+      )}
 
       {/* Actions — side by side */}
       <View style={styles.btnRow}>
@@ -265,7 +290,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: 12,
   },
   heartImg: {
-    width: 28, height: 28, opacity: 0.5, marginBottom: 6,
+    width: 64, height: 64, marginBottom: 8,
   },
   causeLabel: {
     fontSize: 34, fontWeight: '100', letterSpacing: 8, marginBottom: 4,
@@ -298,6 +323,16 @@ const styles = StyleSheet.create({
   stat:       { alignItems: 'center' },
   statValue:  { color: '#fff', fontSize: 18, fontWeight: '300', letterSpacing: 1 },
   statLabel:  { color: '#444', fontSize: 10, letterSpacing: 3, marginTop: 4 },
+  streakRow: {
+    flexDirection: 'row', gap: 20, alignItems: 'center',
+    marginBottom: 14,
+  },
+  streakText: {
+    color: '#888', fontSize: 11, letterSpacing: 4,
+  },
+  streakBest: {
+    color: '#333', fontSize: 10, letterSpacing: 4,
+  },
   btnRow: {
     flexDirection: 'row', gap: 12, width: '100%',
   },
@@ -308,7 +343,4 @@ const styles = StyleSheet.create({
   btnSecondary:     { borderWidth: 1, borderColor: '#222' },
   btnText:          { fontSize: 12, letterSpacing: 4, fontWeight: '300' },
   btnTextSecondary: { color: '#888', fontSize: 12, letterSpacing: 4, fontWeight: '300' },
-  heartImg: {
-    width: 64, height: 64, opacity: 0.6, marginBottom: 8,
-  },
 });

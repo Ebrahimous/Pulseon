@@ -95,6 +95,10 @@ export const useGameStore = create((set, get) => ({
   // ── Death ─────────────────────────────────────────────────────────────────
   deathCause: null,
 
+  // ── Streak (persisted) ────────────────────────────────────────────────────
+  runStreak:  0,
+  bestStreak: 0,
+
   // ── Actions ───────────────────────────────────────────────────────────────
 
   setPhase: (phase) => set({ phase }),
@@ -107,12 +111,30 @@ export const useGameStore = create((set, get) => ({
     strokeAccumMs:   0,
   }),
 
-  /** Load persisted best score from device storage. Call on app start. */
+  /** Load persisted best score and streak from device storage. Call on app start. */
   loadBestScore: async () => {
     try {
       const data = await loadPersisted();
-      if (data?.bestScore > 0) set({ bestScore: data.bestScore });
+      if (data?.bestScore  > 0) set({ bestScore:  data.bestScore });
+      if (data?.runStreak  > 0) set({ runStreak:  data.runStreak });
+      if (data?.bestStreak > 0) set({ bestStreak: data.bestStreak });
     } catch {}
+  },
+
+  /** Called at end of each run. Qualifies if player survived ≥ 15 s. */
+  recordRunResult: (survivalMs) => {
+    const qualified = survivalMs >= 15_000;
+    set((s) => {
+      const newStreak = qualified ? s.runStreak + 1 : 0;
+      const newBest   = Math.max(s.bestStreak, newStreak);
+      return { runStreak: newStreak, bestStreak: newBest };
+    });
+  },
+
+  /** Returns streak values for persistence. */
+  getStreakData: () => {
+    const { runStreak, bestStreak } = get();
+    return { runStreak, bestStreak };
   },
 
   registerTap: (x, y) => {
