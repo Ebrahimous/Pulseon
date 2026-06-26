@@ -68,8 +68,7 @@ export default function GameScreen({ navigation }) {
     ecgHistory, strokeAccumMs, flatlineAccumMs,
     currentBpmLow, currentBpmHigh, spawnCount,
     score, bestScore, combo, bestCombo, deathCause, difficultyLevel,
-    registerTap, tickRings, tickSurvival, tickFlatline, tickStroke,
-    tickDifficulty, tickBpmDecay, startGame, setPlayerPosition,
+    registerTap, tickAll, startGame, setPlayerPosition,
   } = useGameStore();
 
   // Dedicated selectors for values that need guaranteed re-render
@@ -191,12 +190,7 @@ export default function GameScreen({ navigation }) {
       const delta = Math.min(now - lastFrame.t, 100); // cap to avoid spiral after tab-switch
       lastFrame.t = now;
 
-      tickRings(delta);
-      tickSurvival(delta);
-      tickFlatline(delta);
-      tickStroke(delta);
-      tickDifficulty(delta);
-      tickBpmDecay(delta);
+      tickAll(delta);
 
       // Clean expired ripples + floats
       setRipples(r => r.length ? r.filter(rp => now - rp.t < RIPPLE_LIFETIME) : r);
@@ -896,7 +890,7 @@ const styles = StyleSheet.create({
   heart: { fontSize: 18 },
 
   comboLarge: {
-    position: 'absolute', top: 120, right: 20,
+    position: 'absolute', top: 190, right: 20,
     fontSize: 60, fontWeight: '100', letterSpacing: 2,
     zIndex: 15,
   },
@@ -921,7 +915,7 @@ const styles = StyleSheet.create({
   },
 
   floatText: {
-    position: 'absolute', top: 192, right: 20,
+    position: 'absolute', top: 270, right: 20,
     fontSize: 16, fontWeight: '200', letterSpacing: 2,
     zIndex: 25,
   },

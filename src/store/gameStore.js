@@ -16,7 +16,7 @@ const BPM_DECAY_DELAY  = 600;
 
 // Death thresholds
 const FLATLINE_MS     = 3200;
-const STROKE_MS       = 3000;
+const STROKE_MS       = 5000;   // increased from 3 s — more time to correct an overshoot
 const GRACE_PERIOD_MS = 1500;
 
 // Difficulty escalation
@@ -169,7 +169,7 @@ export const useGameStore = create((set, get) => ({
         playerY:         y,
         peakBpm:         Math.max(s.peakBpm, newBpm),
         lowestBpm:       newTaps.length >= 2 ? Math.min(s.lowestBpm, newBpm) : s.lowestBpm,
-        ecgHistory:      [...s.ecgHistory, { t: survivalMs, bpm: newBpm }],
+        ecgHistory:      [...s.ecgHistory, { t: survivalMs, bpm: newBpm }].slice(-300),
         score:           newScore,
         bestScore:       newBestScore,
       };
@@ -253,6 +253,87 @@ export const useGameStore = create((set, get) => ({
 
     const zone = getZoneForBpm(rounded);
     set({ displayBpm: rounded, zone, accentColor: zone.color });
+  },
+
+  // ── tickAll: single set() per frame — replaces 6 individual tick calls ────
+  // Batching everything into one set() means one Zustand notification and one
+  // React re-render per frame instead of up to six.
+  tickAll: (deltaMs) => {
+    const now = Date.now();
+    set((s) => {
+      if (s.phase !== PHASE.PLAYING) return {};
+      const ch = {}; // only touched fields go back to Zustand
+
+      // Rings — advance position + expire
+      const dt      = deltaMs / 16.67;
+      const updated = s.rings.map((r) => {
+        const dir  = r.dir ?? 1;
+        const newR = dir > 0
+          ? r.radius + r.speed * dt
+          : Math.max(0, r.radius - r.speed * dt);
+        return { ...r, radius: newR, spawnOpacity: Math.min(1, (r.spawnOpacity ?? 1) + deltaMs / 300) };
+      });
+      const alive      = updated.filter((r) => (r.dir ?? 1) > 0 ? r.radius < r.maxRadius  : r.radius > 0);
+      const cleanCount = updated.filter((r) => ((r.dir ?? 1) > 0 ? r.radius >= r.maxRadius : r.radius <= 0) && !r.wasHit).length;
+      ch.rings = alive;
+      if (cleanCount > 0) {
+        ch.combo       = s.combo + cleanCount;
+        ch.bestCombo   = Math.max(s.bestCombo, s.combo + cleanCount);
+        ch.ringsDodged = s.ringsDodged + cleanCount;
+      }
+
+      // Survival time
+      ch.survivalMs = s.survivalMs + deltaMs;
+
+      // Flatline
+      if (now - s.gameStartMs >= GRACE_PERIOD_MS) {
+        const newAccum = s.flatlineAccumMs + deltaMs;
+        if (newAccum >= FLATLINE_MS) {
+          return { ...ch, deathCause: 'flatline', phase: PHASE.DYING };
+        }
+        ch.flatlineAccumMs = newAccum;
+      }
+
+      // Stroke (burned out)
+      if (s.displayBpm > s.currentBpmHigh) {
+        const newAccum = s.strokeAccumMs + deltaMs;
+        if (newAccum >= STROKE_MS) {
+          return { ...ch, deathCause: 'stroke', phase: PHASE.DYING };
+        }
+        ch.strokeAccumMs = newAccum;
+      } else if (s.strokeAccumMs > 0) {
+        ch.strokeAccumMs = 0;
+      }
+
+      // Difficulty escalation
+      const newDiffAccum = s.difficultyAccumMs + deltaMs;
+      if (newDiffAccum >= DIFFICULTY_INTERVAL_MS) {
+        ch.currentBpmLow     = Math.min(MIN_RANGE_LOW,  s.currentBpmLow  + RANGE_NARROW_AMOUNT);
+        ch.currentBpmHigh    = Math.max(MIN_RANGE_HIGH, s.currentBpmHigh - RANGE_NARROW_AMOUNT);
+        ch.ringSpeedMult     = Math.min(2.5, s.ringSpeedMult + SPEED_MULT_INCREASE);
+        ch.difficultyLevel   = s.difficultyLevel + 1;
+        ch.difficultyAccumMs = newDiffAccum - DIFFICULTY_INTERVAL_MS;
+      } else {
+        ch.difficultyAccumMs = newDiffAccum;
+      }
+
+      // BPM decay toward resting
+      if (now - s.lastTapMs >= BPM_DECAY_DELAY) {
+        const decay  = (BPM_DECAY_RATE * deltaMs) / 1000;
+        const newBpm = s.displayBpm > BPM_RESTING
+          ? Math.max(BPM_RESTING, s.displayBpm - decay)
+          : Math.min(BPM_RESTING, s.displayBpm + decay);
+        const rounded = Math.round(newBpm);
+        if (rounded !== s.displayBpm) {
+          const zone  = getZoneForBpm(rounded);
+          ch.displayBpm  = rounded;
+          ch.zone        = zone;
+          ch.accentColor = zone.color;
+        }
+      }
+
+      return ch;
+    });
   },
 
   // Ring hit — costs a life, breaks combo, triggers arrest if lives=0
