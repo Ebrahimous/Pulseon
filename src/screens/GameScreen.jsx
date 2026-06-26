@@ -504,10 +504,10 @@ export default function GameScreen({ navigation }) {
         pointerEvents="none"
         style={{
           position: 'absolute',
-          width: 80, height: 80,
+          width: 120, height: 120,
           right: 20,
-          top:   52,
-          opacity: 0.45,
+          top:   44,
+          opacity: 1.0,
           tintColor: '#6B0000',
           transform: [{ scale: heartPulse }],
         }}
@@ -842,7 +842,7 @@ const styles = StyleSheet.create({
   rangeLabel: { fontSize: 7,  letterSpacing: 1, opacity: 0.5, marginTop: 2 },
 
   livesRow: {
-    position: 'absolute', top: 10, left: 16,
+    position: 'absolute', top: 44, left: 16,
     flexDirection: 'row', gap: 6, zIndex: 30,
   },
   heart: { fontSize: 18 },
@@ -883,7 +883,7 @@ const styles = StyleSheet.create({
     fontSize: 26, fontWeight: '100', letterSpacing: 10,
   },
   backBtn: {
-    position: 'absolute', top: 52, left: 20,
+    position: 'absolute', top: 14, left: 16,
     padding: 8, zIndex: 10,
   },
   backBtnText: {
