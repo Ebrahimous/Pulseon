@@ -313,7 +313,7 @@ export default function StartScreen({ navigation }) {
             onPress={() => navigation.navigate('Leaderboard')}
             activeOpacity={0.6}
           >
-            <Text style={styles.lbBtnText}>LEADERBOARD</Text>
+            <Text style={styles.lbBtnText}>RANKINGS</Text>
           </TouchableOpacity>
         )}
 
@@ -438,13 +438,10 @@ const styles = StyleSheet.create({
     width: 72, textAlign: 'right',
   },
   lbBtn: {
-    position: 'absolute', bottom: 40,
-    left: 24, right: 24,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderWidth: 1, borderColor: '#1c1c1c', borderRadius: 2,
+    position: 'absolute', bottom: 52, left: 24,
+    paddingVertical: 6, paddingHorizontal: 4,
   },
   lbBtnText: {
-    color: '#666', fontSize: 10, letterSpacing: 5,
+    color: '#444', fontSize: 11, letterSpacing: 4,
   },
 });
