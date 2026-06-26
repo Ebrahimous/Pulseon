@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, View, Text, Image, StyleSheet, useWindowDimensions } from 'react-native';
+import { Animated, View, Text, Image, StyleSheet, useWindowDimensions, TouchableOpacity } from 'react-native';
 import Svg, {
   Circle, Polyline, Rect, Line,
   Defs, RadialGradient, Stop, Pattern,
@@ -486,15 +486,27 @@ export default function GameScreen({ navigation }) {
       {/* Scanlines */}
       <Scanlines width={width} height={height} />
 
-      {/* Pulsing heart — centred, beats with each tap */}
+      {/* Back arrow — quit to start */}
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => {
+          engineRef.current?.stop();
+          useGameStore.getState().resetGame();
+          navigation.replace('Start');
+        }}
+      >
+        <Text style={styles.backBtnText}>←</Text>
+      </TouchableOpacity>
+
+      {/* Pulsing heart — top-right, beats with each tap */}
       <Animated.Image
         source={require('../../Assets/Heart.png')}
         pointerEvents="none"
         style={{
           position: 'absolute',
-          width: 200, height: 200,
-          left: width / 2 - 100,
-          top:  height / 2 - 100,
+          width: 80, height: 80,
+          right: 20,
+          top:   52,
           opacity: 0.45,
           tintColor: '#6B0000',
           transform: [{ scale: heartPulse }],
@@ -869,6 +881,13 @@ const styles = StyleSheet.create({
   flatlineLabel: {
     position: 'absolute', alignSelf: 'center', top: '43%',
     fontSize: 26, fontWeight: '100', letterSpacing: 10,
+  },
+  backBtn: {
+    position: 'absolute', top: 52, left: 20,
+    padding: 8, zIndex: 10,
+  },
+  backBtnText: {
+    color: '#2a2a2a', fontSize: 20,
   },
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,

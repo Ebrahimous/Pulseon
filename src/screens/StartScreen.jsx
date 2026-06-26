@@ -169,10 +169,29 @@ export default function StartScreen({ navigation }) {
     <TouchableWithoutFeedback onPress={handleTap}>
       <View style={styles.container}>
 
-        {/* How to play — top left */}
-        <TouchableOpacity style={styles.howToPlayBtn} onPress={() => navigation.navigate('HowToPlay')}>
-          <Text style={styles.howToPlayText}>HOW TO PLAY</Text>
-        </TouchableOpacity>
+        {/* How to play — top left (idle only) */}
+        {uiState === 'idle' && (
+          <TouchableOpacity style={styles.howToPlayBtn} onPress={() => navigation.navigate('HowToPlay')}>
+            <Text style={styles.howToPlayText}>HOW TO PLAY</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Back arrow — top left (while tapping, cancels back to idle) */}
+        {uiState !== 'idle' && (
+          <TouchableOpacity
+            style={styles.howToPlayBtn}
+            onPress={() => {
+              stopProgressLoop();
+              tapTimestamps.current = [];
+              inRangeRef.current = 0;
+              setUiState('idle');
+              setLiveBpm(null);
+              setInRangeMs(0);
+            }}
+          >
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Skip button — top right */}
         <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
@@ -301,6 +320,9 @@ const styles = StyleSheet.create({
   },
   howToPlayText: {
     color: '#2a2a2a', fontSize: 11, letterSpacing: 4,
+  },
+  backArrow: {
+    color: '#2a2a2a', fontSize: 20,
   },
   tapWord: {
     color: '#AAAAAA', fontSize: 13, letterSpacing: 10,
