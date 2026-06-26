@@ -321,10 +321,12 @@ const styles = StyleSheet.create({
   },
   howToPlayBtn: {
     position: 'absolute', top: 52, left: 24,
-    paddingVertical: 6, paddingHorizontal: 4,
+    paddingVertical: 7, paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 4,
   },
   howToPlayText: {
-    color: '#2a2a2a', fontSize: 11, letterSpacing: 4,
+    color: '#555', fontSize: 11, letterSpacing: 4,
   },
   backArrow: {
     color: '#2a2a2a', fontSize: 20,
@@ -376,17 +378,23 @@ const styles = StyleSheet.create({
   },
   skipBtn: {
     position: 'absolute', top: 52, right: 24,
-    paddingVertical: 6, paddingHorizontal: 12,
+    paddingVertical: 7, paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 4,
   },
   skipText: {
-    color: '#2a2a2a', fontSize: 11, letterSpacing: 4,
+    color: '#555', fontSize: 11, letterSpacing: 4,
   },
   lbBtn: {
-    position: 'absolute', top: 76, left: 0, right: 0,
+    position: 'absolute', top: 84, left: 0, right: 0,
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   lbBtnText: {
-    color: '#444', fontSize: 11, letterSpacing: 4,
+    color: '#555', fontSize: 11, letterSpacing: 4,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingVertical: 7, paddingHorizontal: 14,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
 });
