@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     color: '#555', fontSize: 14, fontWeight: '300',
   },
   howToPlayBtn: {
-    position: 'absolute', top: 80, left: 24,
+    position: 'absolute', top: 52, left: 24,
     paddingVertical: 6, paddingHorizontal: 4,
   },
   howToPlayText: {
@@ -435,8 +435,9 @@ const styles = StyleSheet.create({
     width: 72, textAlign: 'right',
   },
   lbBtn: {
-    position: 'absolute', top: 52, left: 24,
-    paddingVertical: 6, paddingHorizontal: 4,
+    position: 'absolute', top: 52, left: 0, right: 0,
+    alignItems: 'center',
+    paddingVertical: 6,
   },
   lbBtnText: {
     color: '#444', fontSize: 11, letterSpacing: 4,
