@@ -438,8 +438,9 @@ const styles = StyleSheet.create({
   },
   lbBtn: {
     position: 'absolute', bottom: 36,
-    alignSelf: 'center',
-    paddingVertical: 10, paddingHorizontal: 24,
+    left: 0, right: 0,
+    alignItems: 'center',
+    paddingVertical: 10,
   },
   lbBtnText: {
     color: '#1e1e1e', fontSize: 9, letterSpacing: 5,
