@@ -14,14 +14,12 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View, Text, TouchableWithoutFeedback, TouchableOpacity, StyleSheet, Animated, Image,
 } from 'react-native';
-import { fetchTopScores } from '../utils/leaderboard';
 import * as Haptics from '../utils/haptics';
 import { loadHeartbeat, playHeartbeat } from '../utils/sound';
 import { useGameStore, PHASE, BPM_NORMAL_LOW, BPM_NORMAL_HIGH } from '../store/gameStore';
 
 const IN_RANGE_REQUIRED_MS = 3000;
 const TAP_WINDOW = 6;
-const GRADE_COLOR = { S: '#FFD700', A: '#69FF47', B: '#4FC3F7', C: '#fff', D: '#555' };
 
 export default function StartScreen({ navigation }) {
   const { setPhase, resetGame } = useGameStore();
@@ -33,11 +31,6 @@ export default function StartScreen({ navigation }) {
   const [liveBpm, setLiveBpm]   = useState(null);
   const [inRangeMs, setInRangeMs] = useState(0);       // progress toward 3s
 
-  // Leaderboard
-  const [topScores, setTopScores] = useState([]);
-  useEffect(() => {
-    fetchTopScores(5).then(setTopScores).catch(() => {});
-  }, []);
 
   const tapTimestamps = useRef([]);
   const lastTapRef    = useRef(0);
@@ -270,23 +263,6 @@ export default function StartScreen({ navigation }) {
           </Text>
         )}
 
-        {/* Leaderboard — idle only, top 5 */}
-        {uiState === 'idle' && topScores.length > 0 && (
-          <View style={styles.lbContainer}>
-            <Text style={styles.lbTitle}>TOP SCORES</Text>
-            {topScores.map((entry, i) => (
-              <View key={entry.id} style={styles.lbRow}>
-                <Text style={styles.lbRank}>{i + 1}</Text>
-                <Text style={styles.lbName} numberOfLines={1}>{entry.name}</Text>
-                <Text style={[styles.lbGrade, { color: GRADE_COLOR[entry.grade] || '#555' }]}>
-                  {entry.grade}
-                </Text>
-                <Text style={styles.lbScore}>{Math.floor(entry.score).toLocaleString()}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         {/* Heart image — idle only */}
         {uiState === 'idle' && (
           <Image
@@ -404,35 +380,6 @@ const styles = StyleSheet.create({
   },
   skipText: {
     color: '#2a2a2a', fontSize: 11, letterSpacing: 4,
-  },
-  lbContainer: {
-    position: 'absolute',
-    top: '43%',
-    left: 28, right: 28,
-  },
-  lbTitle: {
-    color: '#1e1e1e', fontSize: 9, letterSpacing: 4,
-    marginBottom: 10,
-  },
-  lbRow: {
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: 7,
-  },
-  lbRank: {
-    color: '#252525', fontSize: 10, letterSpacing: 1,
-    width: 18,
-  },
-  lbName: {
-    color: '#3a3a3a', fontSize: 11, letterSpacing: 2,
-    flex: 1,
-  },
-  lbGrade: {
-    fontSize: 10, letterSpacing: 1,
-    width: 22, textAlign: 'center', opacity: 0.6,
-  },
-  lbScore: {
-    color: '#2e2e2e', fontSize: 11, letterSpacing: 1,
-    width: 72, textAlign: 'right',
   },
   lbBtn: {
     position: 'absolute', top: 76, left: 0, right: 0,

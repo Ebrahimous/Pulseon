@@ -1,4 +1,5 @@
 # Pulse — Project Handoff
+_Last updated: 2026-06-26_
 
 > **How to use this file:** Open a new session, upload this file, and say:
 > *"Read this handoff file and tell me what we're doing next."*
@@ -7,20 +8,15 @@
 
 ## 1. Current Status & Goals
 
-**Project:** Pulse — a minimalist BPM rhythm-survival mobile game built in React Native + Expo SDK 52, deployed as a web app via Cloudflare Pages (GitHub → auto-deploy).
+**Project:** Pulse — a minimalist BPM rhythm-survival mobile game in React Native + Expo SDK 52, deployed as a web app via Cloudflare Pages (GitHub → auto-deploy).
 
-**Current status: All planned features are implemented and deployed.** The last Git commit (`de2ea90`) is pushed to `https://github.com/Ebrahimous/Pulseon` and Cloudflare has built/deployed it.
+**Current status: Core game + online leaderboard fully implemented and deployed.**
 
-**What was just completed (this session):**
-- Suggestion #6 — Near-miss "whoosh" sound (sawtooth frequency sweep on close ring pass)
-- Suggestion #10 — Auto-pause when tab is switched / app is backgrounded (Page Visibility API + AppState)
-- Suggestions #2 #3 #4 #5 #7 #8 were completed in the prior session but are worth verifying in-game
-
-**The full feature list and their current state:**
+**Full feature status:**
 
 | # | Feature | Status |
 |---|---------|--------|
-| 1 | Replace ♥ text lives with Heart.png images | ⬜ Not done |
+| 1 | Replace ♥ text lives with Heart.png images | ⬜ Not done (still `Animated.Text` with `♥` glyph) |
 | 2 | Near-miss visual flash (cyan overlay) | ✅ Done |
 | 3 | Animate death screen heart on arrival | ✅ Done |
 | 4 | Flatline tone on death | ✅ Done |
@@ -31,157 +27,253 @@
 | 9 | PWA installability (home screen icon) | ⬜ Not done |
 | 10 | Auto-pause on tab switch | ✅ Done |
 | 11 | Replace SKIP with practice mode | ⬜ Not done |
+| 12 | Online Firebase leaderboard | ✅ Done |
 
-**Immediate next task options (in priority order):**
-1. Fix the stuck `.git\index.lock` file (blocks all future commits — see §5)
-2. Implement #1 — Heart.png lives display (small, high visual impact)
-3. Implement #9 — PWA installability (requires `app.json` manifest changes + Cloudflare config)
+**Immediate priority options:**
+1. 🔴 Set Firestore security rules (currently open — do before sharing publicly)
+2. Feature #1 — Heart.png lives (small change, high visual impact)
+3. Feature #9 — PWA installability
+4. Fix `lowestBpm: 0` hardcode on DeathScreen (see §5)
 
 ---
 
 ## 2. The "Mental Model" & Architecture
+
+### Navigation stack (`App.js`)
+
+```
+Start → Game → Death → (back to Start via resetGame)
+           ↓
+        HowToPlay
+           ↓
+        Leaderboard
+```
+
+Web gets an extra `WebFrame` wrapper that constrains the layout to a 390×844px phone frame centered on desktop.
 
 ### File Map
 
 ```
 Pulse on/
 ├── Assets/
-│   ├── Heart.png          ← used on start screen, game screen, death screen, lives HUD
-│   └── HeartBeat.wav      ← plays on every tap (expo-av singleton)
+│   ├── Heart.png              ← used in GameScreen HUD (top-right pulse) + DeathScreen header
+│   └── HeartBeat.wav          ← plays on every tap (expo-av singleton)
 ├── src/
 │   ├── screens/
-│   │   ├── StartScreen.jsx    ← BPM gate (tap 65–85 BPM for 3s to enter)
-│   │   ├── GameScreen.jsx     ← Main game loop: rAF tick + bpmEngine (setInterval)
-│   │   ├── DeathScreen.jsx    ← Post-run stats, share card, streak display
-│   │   └── HowToPlayScreen.jsx
+│   │   ├── StartScreen.jsx        ← BPM gate; shows inline top-5 + RANKINGS button
+│   │   ├── GameScreen.jsx         ← Entire game: rAF loop + bpmEngine + all animations
+│   │   ├── DeathScreen.jsx        ← Post-run stats, ECG waveform, leaderboard submit, share
+│   │   ├── LeaderboardScreen.jsx  ← Full top-10 (rank, name, grade, time, score)
+│   │   └── HowToPlayScreen.jsx    ← Static rules
 │   ├── store/
-│   │   └── gameStore.js       ← Zustand store; ALL game state lives here
+│   │   └── gameStore.js           ← Zustand; ALL game state + tickAll (single-set game tick)
 │   ├── engine/
-│   │   ├── bpmEngine.js       ← Ring spawner (setInterval, adapts to player BPM)
-│   │   ├── collision.js       ← Ring hit + near-miss detection
-│   │   └── zoneManager.js     ← 5 BPM zones: surface/shallow/deep/abyss/void
+│   │   ├── bpmEngine.js           ← Ring spawner (setInterval, adapts to player BPM)
+│   │   ├── collision.js           ← checkAllRings, checkRingCollision
+│   │   └── zoneManager.js         ← ZONES array (5 zones) + getZoneForBpm()
 │   └── utils/
-│       ├── sound.js           ← Audio: loadHeartbeat, playHeartbeat, playFlatline, playHit, playWhoosh
-│       ├── haptics.js         ← Native haptics (expo-haptics)
-│       ├── haptics.web.js     ← Web haptics (navigator.vibrate shim)
-│       ├── storage.js         ← Native persistence (expo-file-system → pulse_save.json)
-│       ├── storage.web.js     ← Web persistence (localStorage)
-│       ├── capture.js         ← Native screenshot (react-native-view-shot)
-│       └── capture.web.js     ← Web screenshot stub (canvas-based share in DeathScreen)
-├── deploy.bat                 ← git add . && git commit -m "update" && git push
-└── HANDOFF.md                 ← this file
+│       ├── firebase.js            ← Firebase init + Firestore export (`db`)
+│       ├── leaderboard.js         ← submitScore(), fetchTopScores(n)
+│       ├── storage.js             ← loadPersisted / savePersisted (expo-file-system, native only)
+│       ├── sound.js               ← loadHeartbeat, playHeartbeat, playFlatline, playHit, playWhoosh
+│       ├── haptics.js             ← re-exports expo-haptics (native only; web shim assumed)
+│       ├── capture.js             ← re-exports captureRef from react-native-view-shot
+│       └── ecgRenderer.js         ← generateEcgSvg() — PQRST waveform SVG string
+├── App.js
+├── deploy.bat                 ← One-click deploy to Cloudflare (reliable)
+└── HANDOFF.md
 ```
 
-### How the game loop works
+### State: `gameStore.js` (Zustand)
 
-Two parallel systems run during gameplay:
+All game state in one store. Key fields:
 
-1. **bpmEngine** (`setInterval` at ~player BPM rate) — spawns rings, reschedules itself when BPM changes significantly. Lives in `engineRef.current` in GameScreen.
-2. **rAF tick** (`requestAnimationFrame` loop in `useEffect([phase])`) — moves rings, checks collisions, accumulates flatline/stroke timers, ticks survival time. Reads state from `useGameStore.getState()` directly (not via React subscription) to avoid stale closures.
+| Field | Type | Notes |
+|-------|------|-------|
+| `phase` | string | `start \| playing \| dying \| dead` |
+| `displayBpm` | number | Tap-derived, smoothed (0.5), decays to 75 when idle |
+| `rings[]` | array | `{ id, originX, originY, radius, speed, maxRadius, dir, type, wasHit, spawnOpacity }` |
+| `lives` | number | 3 hearts; `markRingHit()` decrements; 0 → arrest death |
+| `flatlineAccumMs` | number | Accumulates when no tap; death at 3200ms |
+| `strokeAccumMs` | number | Accumulates when BPM > `currentBpmHigh`; death at 5000ms |
+| `currentBpmLow/High` | number | Safe window; starts 65–85, narrows every 30s |
+| `ringSpeedMult` | number | Starts 1.0, increases by 0.15 per difficulty tick, caps at 2.5 |
+| `score / combo / bestScore / bestCombo` | number | `bestScore` persists via storage; NOT reset on `resetGame()` |
+| `ecgHistory[]` | array | `{ t, bpm }`, capped at 300 entries, used by ECG renderer |
+| `runStreak / bestStreak` | number | Persisted; qualified runs are ≥15s |
 
-The two systems are paused together via `isPausedRef` (rAF no-ops) + `engineRef.current.stop()` (clears the interval) on tab-hide / app-background.
+**`tickAll(deltaMs)`** — single `set()` call per frame batching: rings advance + expiry + combo award, survival time, flatline check, stroke check, difficulty escalation, BPM decay. One Zustand notification = one React re-render per frame.
 
-### Key architecture rules (don't break these)
+**`resetGame()`** intentionally does NOT reset `bestScore`, `runStreak`, `bestStreak`.
 
-- **Web share is canvas-only** — never load external images into the share canvas (tainted-canvas errors). The DeathScreen share function draws everything as primitives directly from `ecgHistory` data.
-- **Sounds are Web Audio API** — `playFlatline`, `playHit`, `playWhoosh` all call `makeCtx()` which safely returns `null` on native, so they silently no-op. `playHeartbeat` uses expo-av (works on both).
-- **`.web.js` files are platform shims** — `haptics.web.js`, `storage.web.js`, `capture.web.js` shadow their native counterparts. Metro/Expo auto-resolves them on web.
-- **gameStore.resetGame()** intentionally does NOT reset `bestScore`, `runStreak`, or `bestStreak` — those are persisted across runs.
+### Ring types
+
+| Type | `dir` | Speed multiplier | Color | Notes |
+|------|-------|-----------------|-------|-------|
+| `normal` | +1 (outward) | 1.0× | zone `accentColor` | Standard |
+| `fast` | +1 (outward) | 2.2× | `#FF6B6B` (red) | Smaller max radius |
+| `inward` | -1 (shrinking) | 0.75× | `#FFB347` (orange) | Starts at maxRadius, dashed stroke |
+
+Weighted spawn: 60% normal / 25% fast / 15% inward.
+
+Spawn origin is guaranteed to be ≥ `200 + ringSpeedMult * 60` px from the player (up to 12 retry attempts).
+
+Rings fade in over 300ms via `spawnOpacity` (0→1).
+
+### Zones (BPM → accent color)
+
+| Zone | BPM | Color | Score multiplier |
+|------|-----|-------|-----------------|
+| Surface | 50–79 | `#00E5FF` cyan | ×1 |
+| Shallow | 80–99 | `#69FF47` green | ×1.5 |
+| Deep | 100–119 | `#FFD740` amber | ×2.5 |
+| Abyss | 120–139 | `#FF6D00` orange | ×4 |
+| Void | 140–160 | `#E040FB` magenta | ×7 |
+
+### Two parallel systems in GameScreen
+
+1. **`bpmEngine`** (setInterval at player's BPM) — spawns rings; reschedules when BPM shifts ≥2. Ref: `engineRef.current`. Progressive frequency: `freqMult = min(3.0, 1 + score/500)`.
+2. **rAF tick** (requestAnimationFrame loop) — calls `tickAll`, cleans ripples/floats, runs collision, checks phase. Paused via `isPausedRef` (no-ops rAF) + `engineRef.current.stop()` on tab-hide/app-background.
+
+### Collision (`collision.js`)
+
+- `HIT_THRESHOLD = 14px` — edge distance for a hit
+- `NEAR_MISS_RANGE = 24px` — edge distance for near-miss adrenaline spike
+- Hit → `markRingHit(id)` → lose life; if lives=0 → arrest death
+- Near miss → `applyNearMissScare()` (+5–7 BPM spike) + `playWhoosh()` + cyan flash overlay
+
+Hit invincibility: `HIT_INVINCIBILITY_MS = 1000ms` (prevents multi-hit cascades).
+
+### Firebase / Leaderboard
+
+- **Project:** `pulseon-d9fee` (Firestore)
+- **Collection:** `leaderboard`
+- **Fields:** `name, score, survivalMs, grade, zoneName, bestCombo, timestamp`
+- `submitScore()` — called from DeathScreen; player name persisted to `localStorage` (web) for pre-fill
+- `fetchTopScores(n)` — called on StartScreen mount (top 5) and LeaderboardScreen mount (top 10)
+- Both functions wrapped in try/catch; silently degrade on network failure
+
+**🔴 Security rules NOT yet set.** Database is in test mode. Rules to apply:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /leaderboard/{entry} {
+      allow read: true;
+      allow create: if request.resource.data.score is number
+                    && request.resource.data.score > 0
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 20;
+    }
+  }
+}
+```
+
+Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
+
+### ECG waveform (`ecgRenderer.js`)
+
+`generateEcgSvg({ ecgHistory, score, deathCause, zoneName, peakBpm, lowestBpm, survivalMs })` — outputs an SVG string of proper PQRST complexes built from tap timestamps. Used by DeathScreen via `<SvgXml>`. For `arrest` death, replaces the tail with a V-fib pattern.
 
 ---
 
 ## 3. Exact Next Steps
 
-### Immediate — fix the git lock (do this before anything else)
+**1. (Fastest / highest impact) Fix `lowestBpm: 0` on DeathScreen**
+- Open `src/screens/DeathScreen.jsx`, line ~92
+- Change `lowestBpm: 0` → `lowestBpm` from the store (already destructured in the component as `const { ..., peakBpm, ... } = useGameStore()` — add `lowestBpm` there)
+- This fixes the ECG stats line which always says "0 BPM low"
 
-1. Open File Explorer or a terminal on the PC/laptop
-2. Delete: `C:\Users\EB\Claude\Projects\Pulse on\.git\index.lock`
-3. After that, `deploy.bat` will work normally again
+**2. 🔴 Set Firestore security rules**
+- Log in to Firebase Console, paste the rules from §2 above → Publish
+- Do this before sharing the game URL with anyone
 
-### Feature #1 — Heart.png lives display (easiest win)
+**3. Feature #1 — Replace ♥ text lives with Heart.png**
+- In `GameScreen.jsx`, find the `livesRow` View (search for `livesRow` or `♥`)
+- Replace `Animated.Text` with `Animated.Image` for each heart slot:
+  ```jsx
+  <Animated.Image
+    key={i}
+    source={require('../../Assets/Heart.png')}
+    style={{
+      width: 18, height: 18,
+      tintColor: i < lives ? '#FF1744' : '#1e1e1e',
+      transform: [{ scale: heartScales[i] }],
+    }}
+    resizeMode="contain"
+  />
+  ```
+- The `heartScales` animations already work — no logic changes needed
 
-Currently lives are shown as `♥ ♥ ♥` text characters in GameScreen's HUD. Replace with `Heart.png` images:
+**4. Feature #9 — PWA installability**
+- In `app.json`, under `"expo"`, add: `"web": { "name": "Pulse", "shortName": "Pulse", "themeColor": "#050810", "backgroundColor": "#050810" }`
+- Expo auto-generates the manifest on `expo export --platform web`
+- Test in Chrome: deployed URL → address bar install icon
 
-- Open `src/screens/GameScreen.jsx`
-- Find the lives HUD section (search for `♥` or `heartScales`)
-- The `heartScales` array already exists (`useRef([new Animated.Value(1), ...])`). The hearts already scale-animate on hit. Just replace the `Text` rendering with `Animated.Image` using `Heart.png` with `tintColor` set per-life to the zone's `accentColor`.
-- Size: 18×18 or 20×20 px, `opacity: 0.85`
-
-### Feature #9 — PWA installability
-
-- Open `app.json` (Expo config at project root)
-- Add `"web": { "name": "Pulse", "shortName": "Pulse", "themeColor": "#000000", "backgroundColor": "#000000" }` under `"expo"`
-- Add a `public/manifest.json` if Cloudflare Pages needs it (Expo usually auto-generates one from app.json)
-- Add a 512×512 icon to `Assets/` for the PWA icon (or reuse Heart.png scaled up)
-- Test by opening the deployed URL in Chrome and checking for the install prompt in the address bar
-
-### Feature #11 — Practice mode (replace SKIP)
-
-- In `StartScreen.jsx`, the SKIP button currently calls `resetGame()` and navigates to Game
-- Change it to navigate to Game but also set a `practiceMode: true` flag in the store
-- In GameScreen, when `practiceMode === true`: disable the death screen navigation and lives loss, show a "PRACTICE" watermark overlay
-- In gameStore: add `practiceMode: false` to state, reset it to `false` in `resetGame()`
+**5. Feature #11 — Practice mode (replace SKIP)**
+- Add `practiceMode: false` to gameStore initial state; reset in `resetGame()`
+- SKIP button sets `practiceMode: true` before navigating to Game
+- In GameScreen: when `practiceMode === true`, disable death navigation + life loss, add "PRACTICE" watermark
 
 ---
 
 ## 4. Recent Changes & Decisions
 
-### This session (June 25, 2026)
+### June 26, 2026
 
-**#6 — Near-miss whoosh sound** (`src/utils/sound.js`)
-- Added `playWhoosh()` — a `sawtooth` oscillator frequency-ramped from 640 Hz → 80 Hz over 0.18s
-- Called in `GameScreen.jsx` inside the `nearMissIds` branch of the collision check, alongside the existing cyan flash and BPM spike
-- Decision: sawtooth chosen over sine for a more "doppler" feel; short duration keeps it snappy
+**Firebase leaderboard** (`firebase.js`, `leaderboard.js`)
+- Firebase v12 modular SDK (`firebase/app`, `firebase/firestore`)
+- `submitScore()` writes to `leaderboard` collection; `fetchTopScores(n)` queries score desc
 
-**#10 — Auto-pause** (`src/screens/GameScreen.jsx`)
-- Added `isPausedRef` (ref, for synchronous access inside rAF) + `isPaused` (state, for React re-render of overlay)
-- `useEffect([phase])` subscribes to `document.visibilitychange` (web) and `AppState` (native)
-- On hide: `engineRef.current.stop()` + `isPausedRef.current = true`
-- On resume: `useGameStore.setState({ lastTapMs: Date.now() })` (prevents instant flatline on return) + `engineRef.current.start()` + `isPausedRef.current = false`
-- Added "PAUSED / return to continue" dim overlay in JSX
-- Decision: we keep the rAF loop alive during pause (just no-ops) rather than cancelling and restarting it, because the rAF `useEffect([phase])` cleanup would fight with our manual restart attempt
+**DeathScreen submit UI** (`DeathScreen.jsx`)
+- TextInput for name (max 20 chars, auto-caps, localStorage pre-fill on web)
+- SUBMIT → `submitScore()` → "POSTED TO LEADERBOARD ✓"
+- State machine: `idle | submitting | done | error` (RETRY on error)
 
-### Prior session (June 23, 2026) — commit de2ea90
+**LeaderboardScreen** (new screen, added to App.js as `"Leaderboard"`)
+- Table: rank, name, grade (color-coded), time, score; REFRESH button; top-3 special styling
 
-- **#2** Cyan near-miss flash (Animated overlay, `nearMissFlash` value)
-- **#3** Death screen heart entrance animation (scale 1.6 → 1.0, fade in on mount)
-- **#4** Flatline tone (`playFlatline` — 1 kHz sine, 1.4s fade via Web Audio)
-- **#5** Hit/damage sound (`playHit` — 160 Hz sawtooth, 0.28s via Web Audio), called in the `lives` useEffect
-- **#7** Run streak counter — `runStreak`/`bestStreak` added to `gameStore.js`, persisted via `savePersisted()`, displayed on DeathScreen with gold styling at 3+
-- **#8** BPM range-narrow announcement — `diffAnnounceOpacity` + `diffAnnounceText` state in GameScreen, fires on `difficultyLevel` change, shows `RANGE  72–78 BPM` in red
+**StartScreen** — RANKINGS button (centered, `top: 76`); inline top-5 display in idle state
+
+**deploy.bat reliability fixes**
+- `git config --global gc.auto 0` — suppresses GC (persists globally)
+- `git status > nul` before `git add -A` — forces index refresh
+- `--allow-empty` commit — Cloudflare always rebuilds
+- `echo n | git push` — auto-dismisses Windows pack unlink prompt
+
+### June 25, 2026
+
+- 7 visual polish passes: dark navy `#050810`, vivid red heart `#E53935`, zone color tint, green in-range edge glow, gold combo milestone flash, renamed death causes, updated taglines
+- Back buttons on StartScreen (while tapping) and GameScreen (quit to Start)
+- Heart image repositioned: `top: 4, right: 20`, 100×100px, tintColor `#E53935`
+- **`tickAll()` optimization** — 6 Zustand `set()` calls → 1 per frame (≈6× fewer re-renders)
+- `STROKE_MS` increased 3000ms → 5000ms (more forgiving overshoot recovery)
+- `ecgHistory` capped at 300 entries
+- Inward ring type (`dir: -1`), safe-zone spawn guarantee, `spawnOpacity` fade-in
+
+### June 23, 2026
+
+- Features #2–#8, #10 implemented: near-miss flash, death screen heart animation, flatline sound, hit sound, whoosh sound, run streak, BPM range announcement, auto-pause
 
 ---
 
 ## 5. Open Blocks & Known Issues
 
-### 🔴 Critical — `.git\index.lock` blocks all commits
+**🔴 Firestore security rules not set** — database is open write. Apply rules from §2 before going public.
 
-```
-C:\Users\EB\Claude\Projects\Pulse on\.git\index.lock
-```
+**🟡 `lowestBpm: 0` hardcode on DeathScreen** — `generateEcgSvg()` receives `lowestBpm: 0` (line ~92 of `DeathScreen.jsx`). The store tracks `lowestBpm` correctly — just pass it through.
 
-This file was left by a previous crashed git process. Until deleted, `deploy.bat` will fail with:
-```
-fatal: Unable to create '...index.lock': File exists.
-```
+**🟡 `storage.js` uses `expo-file-system` — silently no-ops on web** — `FileSystem.documentDirectory` is null on web. `loadBestScore` and `savePersisted` silently fail on web (no local persistence across sessions on web). Fix: branch on `Platform.OS === 'web'` and use `localStorage` instead.
 
-**Fix:** Delete the file manually. It's safe to delete — it's just a lock file, not data.
+**🟡 Flatline/whoosh sounds may be blocked on iOS Safari** — Web Audio API requires a user-gesture-unlocked AudioContext. `playFlatline` fires on death inside rAF, not directly from a tap. Workaround: unlock a shared `AudioContext` singleton on the first tap event, then reuse it in all synth sound functions.
 
-### 🟡 Streak threshold tuning
+**🟡 `tickRings` and `tickSurvival` in `gameStore.js` are dead code** — With `tickAll`, these functions (lines ~430–460) are no longer called. Safe to remove to reduce confusion.
 
-The streak counter only increments if a run lasts ≥ 15 seconds (`STREAK_THRESHOLD_MS = 15_000` in `gameStore.js → recordRunResult`). This was a reasonable default but might feel too strict or too lenient depending on playtesting. Easy to tune by changing that constant.
+**🟢 No score deduplication in Firestore** — Players can submit multiple times; each creates a new document. Low priority unless spam becomes a problem.
 
-### 🟡 Flatline/hit/whoosh sounds don't work on iOS Safari
-
-Web Audio API (`AudioContext`) requires a user gesture to unlock on iOS. The heartbeat sound works because it's triggered by a tap. But `playFlatline` (triggered on death, from inside the rAF loop) may be silently blocked on iOS Safari. This is a known iOS restriction. A workaround would be to pre-unlock the AudioContext on the first tap and reuse it as a singleton — currently `makeCtx()` creates a fresh context every time.
-
-### 🟡 Ring spawning + index.lock interaction
-
-Because `deploy.bat` can't commit right now, any new changes you make locally won't be deployable until the lock file is deleted.
-
-### 🟢 No functional regressions known
-
-All code is linted-clean (no obvious syntax errors). The game is live and playable at the Cloudflare Pages URL.
+**🟢 No known functional regressions.** Game is live and playable.
 
 ---
 
@@ -190,13 +282,13 @@ All code is linted-clean (no obvious syntax errors). The game is live and playab
 | Thing | Value |
 |-------|-------|
 | Framework | React Native + Expo SDK 52 |
-| Target | Web (Cloudflare Pages) — native is secondary |
+| Primary target | Web (Cloudflare Pages) — native is secondary |
 | State management | Zustand (`useGameStore`) |
-| Audio | expo-av (heartbeat) + Web Audio API (synth sounds) |
-| Animations | React Native `Animated` + `react-native-svg` (Animated wrappers) |
-| Gestures | `react-native-gesture-handler` |
-| Persistence | `expo-file-system` (native) / `localStorage` (web) |
-| Deployment | GitHub push → Cloudflare Pages auto-build |
-| Deploy command | `deploy.bat` (or `git add . && git commit -m "update" && git push`) |
-| Live URL | Cloudflare Pages (check Cloudflare dashboard for exact URL) |
+| Audio | expo-av (heartbeat WAV) + Web Audio API (synth: flatline, hit, whoosh) |
+| Animations | React Native `Animated` + `react-native-svg` |
+| Gestures | `react-native-gesture-handler` (Gesture.Pan) |
+| Persistence | `expo-file-system` (native) / `localStorage` (web, name only) |
+| Database | Firebase Firestore (`pulseon-d9fee`) |
+| Deployment | `deploy.bat` → GitHub push → Cloudflare Pages auto-build |
 | GitHub repo | https://github.com/Ebrahimous/Pulseon |
+| Firebase console | https://console.firebase.google.com → project `pulseon-d9fee` |
