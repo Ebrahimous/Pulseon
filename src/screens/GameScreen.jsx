@@ -192,9 +192,17 @@ export default function GameScreen({ navigation }) {
 
       tickAll(delta);
 
-      // Clean expired ripples + floats
-      setRipples(r => r.length ? r.filter(rp => now - rp.t < RIPPLE_LIFETIME) : r);
-      setFloats(f  => f.length ? f.filter(fl => now - fl.t < FLOAT_LIFETIME)  : f);
+      // Clean expired ripples + floats — return same ref if nothing expired (avoids extra re-render)
+      setRipples(prev => {
+        if (!prev.length) return prev;
+        const next = prev.filter(rp => now - rp.t < RIPPLE_LIFETIME);
+        return next.length < prev.length ? next : prev;
+      });
+      setFloats(prev => {
+        if (!prev.length) return prev;
+        const next = prev.filter(fl => now - fl.t < FLOAT_LIFETIME);
+        return next.length < prev.length ? next : prev;
+      });
 
       // Collision
       const { playerX: px, playerY: py, rings: cur } = useGameStore.getState();

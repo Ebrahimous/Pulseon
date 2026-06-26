@@ -53,7 +53,7 @@ export default function DeathScreen({ navigation }) {
   const [submitState, setSubmitState] = useState('idle'); // idle | submitting | done | error
 
   const {
-    ecgHistory, score, bestScore, zone, peakBpm,
+    ecgHistory, score, bestScore, zone, peakBpm, lowestBpm,
     survivalMs, bestCombo, deathCause, ringsDodged, resetGame,
     runStreak, bestStreak,
   } = useGameStore();
@@ -88,7 +88,7 @@ export default function DeathScreen({ navigation }) {
   const svgString = useMemo(() => generateEcgSvg({
     ecgHistory, score, deathCause,
     zoneName: zone.label,
-    peakBpm, lowestBpm: 0, survivalMs,
+    peakBpm, lowestBpm, survivalMs,
   }), [ecgHistory, score, deathCause, zone, peakBpm, survivalMs]);
 
   const survivalSec   = Math.floor(survivalMs / 1000);

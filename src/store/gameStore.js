@@ -85,9 +85,10 @@ export const useGameStore = create((set, get) => ({
   maxLives: 3,
 
   // ── ECG ───────────────────────────────────────────────────────────────────
-  ecgHistory: [],
-  peakBpm:    75,
-  lowestBpm:  75,
+  ecgHistory:  [],
+  peakBpm:     75,
+  lowestBpm:   75,
+  lastEcgMs:   0,   // last time we appended to ecgHistory (rate-limited to ~5 Hz)
 
   // ── Run stats ─────────────────────────────────────────────────────────────
   ringsDodged: 0,
@@ -167,11 +168,9 @@ export const useGameStore = create((set, get) => ({
         accentColor:     zone.color,
         playerX:         x,
         playerY:         y,
-        peakBpm:         Math.max(s.peakBpm, newBpm),
-        lowestBpm:       newTaps.length >= 2 ? Math.min(s.lowestBpm, newBpm) : s.lowestBpm,
-        ecgHistory:      [...s.ecgHistory, { t: survivalMs, bpm: newBpm }].slice(-300),
         score:           newScore,
         bestScore:       newBestScore,
+        // ecgHistory, peakBpm, lowestBpm sampled in tickAll to avoid per-tap array spread
       };
     });
   },
@@ -332,6 +331,20 @@ export const useGameStore = create((set, get) => ({
         }
       }
 
+      // ECG history — sampled at ~5 Hz to avoid per-tap array spread in registerTap
+      const curBpm = ch.displayBpm ?? s.displayBpm;
+      const curMs  = ch.survivalMs ?? s.survivalMs;
+      if (curMs - s.lastEcgMs >= 200) {
+        const entry = { t: curMs, bpm: curBpm };
+        ch.ecgHistory = s.ecgHistory.length < 300
+          ? [...s.ecgHistory, entry]
+          : [...s.ecgHistory.slice(1), entry];
+        ch.lastEcgMs  = curMs;
+        // Peak / lowest BPM
+        if (curBpm > s.peakBpm)    ch.peakBpm   = curBpm;
+        if (curBpm < s.lowestBpm)  ch.lowestBpm = curBpm;
+      }
+
       return ch;
     });
   },
@@ -482,6 +495,7 @@ export const useGameStore = create((set, get) => ({
     // bestScore NOT reset — persists as all-time best
     survivalMs:        0,
     ecgHistory:        [],
+    lastEcgMs:         0,
     peakBpm:           75,
     lowestBpm:         75,
     ringsDodged:       0,
