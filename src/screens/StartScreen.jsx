@@ -306,6 +306,16 @@ export default function StartScreen({ navigation }) {
           <Text style={styles.rangeHint}>{BPM_NORMAL_LOW} — {BPM_NORMAL_HIGH} BPM</Text>
         )}
 
+        {/* Leaderboard button — idle only, bottom center */}
+        {uiState === 'idle' && (
+          <TouchableOpacity
+            style={styles.lbBtn}
+            onPress={() => navigation.navigate('Leaderboard')}
+          >
+            <Text style={styles.lbBtnText}>LEADERBOARD</Text>
+          </TouchableOpacity>
+        )}
+
       </View>
     </TouchableWithoutFeedback>
   );
@@ -425,5 +435,13 @@ const styles = StyleSheet.create({
   lbScore: {
     color: '#2e2e2e', fontSize: 11, letterSpacing: 1,
     width: 72, textAlign: 'right',
+  },
+  lbBtn: {
+    position: 'absolute', bottom: 36,
+    alignSelf: 'center',
+    paddingVertical: 10, paddingHorizontal: 24,
+  },
+  lbBtnText: {
+    color: '#1e1e1e', fontSize: 9, letterSpacing: 5,
   },
 });
