@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     width: 72, textAlign: 'right',
   },
   lbBtn: {
-    position: 'absolute', top: 52, left: 0, right: 0,
+    position: 'absolute', top: 76, left: 0, right: 0,
     alignItems: 'center',
     paddingVertical: 6,
   },
