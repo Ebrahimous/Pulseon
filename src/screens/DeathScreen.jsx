@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image, Animated,
+  TextInput, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { Platform } from 'react-native';
@@ -9,6 +10,18 @@ import * as FileSystem from 'expo-file-system';
 import { captureRef } from '../utils/capture';
 import { useGameStore } from '../store/gameStore';
 import { generateEcgSvg } from '../utils/ecgRenderer';
+import { submitScore } from '../utils/leaderboard';
+
+// Persist player name across runs (web only)
+const NAME_KEY = 'pulse_player_name';
+function loadSavedName() {
+  try { return (typeof localStorage !== 'undefined' && localStorage.getItem(NAME_KEY)) || ''; }
+  catch { return ''; }
+}
+function saveNameLocally(n) {
+  try { typeof localStorage !== 'undefined' && localStorage.setItem(NAME_KEY, n); }
+  catch {}
+}
 
 // ── Grade ─────────────────────────────────────────────────────────────────────
 function calcGrade(survivalMs, bestCombo) {
@@ -36,6 +49,10 @@ export default function DeathScreen({ navigation }) {
     ]).start();
   }, []);
 
+  // Leaderboard submit state
+  const [playerName,  setPlayerName]  = useState(loadSavedName);
+  const [submitState, setSubmitState] = useState('idle'); // idle | submitting | done | error
+
   const {
     ecgHistory, score, bestScore, zone, peakBpm,
     survivalMs, bestCombo, deathCause, ringsDodged, resetGame,
@@ -52,6 +69,22 @@ export default function DeathScreen({ navigation }) {
 
   const grade      = calcGrade(survivalMs, bestCombo);
   const gradeColor = GRADE_COLOR[grade];
+
+  const handleSubmit = async () => {
+    const trimmed = playerName.trim();
+    if (!trimmed) return;
+    setSubmitState('submitting');
+    saveNameLocally(trimmed);
+    const ok = await submitScore({
+      name:       trimmed,
+      score,
+      survivalMs,
+      grade,
+      zoneName:   zone.label,
+      bestCombo,
+    });
+    setSubmitState(ok ? 'done' : 'error');
+  };
 
   const svgString = useMemo(() => generateEcgSvg({
     ecgHistory, score, deathCause,
@@ -254,6 +287,36 @@ export default function DeathScreen({ navigation }) {
         </View>
       )}
 
+      {/* Leaderboard submit */}
+      {submitState !== 'done' ? (
+        <View style={styles.submitRow}>
+          <TextInput
+            style={styles.nameInput}
+            placeholder="YOUR NAME"
+            placeholderTextColor="#333"
+            value={playerName}
+            onChangeText={setPlayerName}
+            maxLength={20}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+            editable={submitState !== 'submitting'}
+          />
+          <TouchableOpacity
+            style={[styles.submitBtn, submitState === 'submitting' && { opacity: 0.5 }]}
+            onPress={handleSubmit}
+            disabled={submitState === 'submitting' || !playerName.trim()}
+          >
+            <Text style={styles.submitBtnText}>
+              {submitState === 'submitting' ? '...' : submitState === 'error' ? 'RETRY' : 'SUBMIT'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text style={styles.submittedText}>POSTED TO LEADERBOARD ✓</Text>
+      )}
+
       {/* Actions — side by side */}
       <View style={styles.btnRow}>
         <TouchableOpacity
@@ -332,6 +395,28 @@ const styles = StyleSheet.create({
   },
   streakBest: {
     color: '#333', fontSize: 10, letterSpacing: 4,
+  },
+  submitRow: {
+    flexDirection: 'row', width: '100%', marginBottom: 12, gap: 8,
+  },
+  nameInput: {
+    flex: 1, height: 44,
+    borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 2,
+    paddingHorizontal: 12,
+    color: '#fff', fontSize: 12, letterSpacing: 3, fontWeight: '300',
+    backgroundColor: '#080c14',
+  },
+  submitBtn: {
+    height: 44, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 2,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  submitBtnText: {
+    color: '#555', fontSize: 11, letterSpacing: 3,
+  },
+  submittedText: {
+    color: '#69FF47', fontSize: 10, letterSpacing: 3,
+    marginBottom: 12, alignSelf: 'flex-start',
   },
   btnRow: {
     flexDirection: 'row', gap: 12, width: '100%',
