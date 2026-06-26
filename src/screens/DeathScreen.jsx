@@ -4,7 +4,6 @@ import {
   TextInput, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { Platform } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { captureRef } from '../utils/capture';
