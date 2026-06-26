@@ -177,6 +177,13 @@ export default function StartScreen({ navigation }) {
     <TouchableWithoutFeedback onPress={handleTap}>
       <View style={styles.container}>
 
+        {/* Leaderboard — top left, above HOW TO PLAY (idle only) */}
+        {uiState === 'idle' && (
+          <TouchableOpacity style={styles.lbBtn} onPress={() => navigation.navigate('Leaderboard')}>
+            <Text style={styles.lbBtnText}>RANKINGS</Text>
+          </TouchableOpacity>
+        )}
+
         {/* How to play — top left (idle only) */}
         {uiState === 'idle' && (
           <TouchableOpacity style={styles.howToPlayBtn} onPress={() => navigation.navigate('HowToPlay')}>
@@ -306,16 +313,6 @@ export default function StartScreen({ navigation }) {
           <Text style={styles.rangeHint}>{BPM_NORMAL_LOW} — {BPM_NORMAL_HIGH} BPM</Text>
         )}
 
-        {/* Leaderboard button — idle only, bottom center */}
-        {uiState === 'idle' && (
-          <TouchableOpacity
-            style={styles.lbBtn}
-            onPress={() => navigation.navigate('Leaderboard')}
-            activeOpacity={0.6}
-          >
-            <Text style={styles.lbBtnText}>RANKINGS</Text>
-          </TouchableOpacity>
-        )}
 
       </View>
     </TouchableWithoutFeedback>
@@ -347,7 +344,7 @@ const styles = StyleSheet.create({
     color: '#555', fontSize: 14, fontWeight: '300',
   },
   howToPlayBtn: {
-    position: 'absolute', top: 52, left: 24,
+    position: 'absolute', top: 80, left: 24,
     paddingVertical: 6, paddingHorizontal: 4,
   },
   howToPlayText: {
@@ -438,7 +435,7 @@ const styles = StyleSheet.create({
     width: 72, textAlign: 'right',
   },
   lbBtn: {
-    position: 'absolute', bottom: 52, left: 24,
+    position: 'absolute', top: 52, left: 24,
     paddingVertical: 6, paddingHorizontal: 4,
   },
   lbBtnText: {
