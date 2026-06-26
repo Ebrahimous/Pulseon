@@ -202,18 +202,14 @@ export default function StartScreen({ navigation }) {
         {uiState === 'idle' && (
           <View style={styles.taglineBlock}>
             <Text style={styles.tagline}>
-              <Text style={styles.tagEmphasis}>TAP</Text>
-              <Text style={styles.tagDim}> wait </Text>
-              <Text style={styles.tagEmphasis}>TAP</Text>
-              {'\n'}
-              <Text style={styles.tagSmall}>as a heart beats</Text>
+              {'YOUR HEART.\n'}
+              <Text style={styles.tagEmphasis}>YOUR TEMPO.</Text>
             </Text>
             <Text style={styles.tagline}>
-              {'Do '}
-              <Text style={styles.tagEmphasis}>NOT</Text>
-              {' let the\n'}
-              <Text style={styles.tagEmphasis}>RINGS</Text>
-              {' touch you'}
+              {'DODGE every '}
+              <Text style={styles.tagEmphasis}>RING.</Text>
+              {'\n'}
+              <Text style={styles.tagSmall}>tap to set your rhythm</Text>
             </Text>
           </View>
         )}
@@ -255,7 +251,7 @@ export default function StartScreen({ navigation }) {
 
         {uiState !== 'idle' && (
           <Text style={styles.sub}>
-            {isLocked ? '' : inRange ? 'hold the rhythm...' : 'find the steady pace'}
+            {isLocked ? '' : inRange ? 'lock it in...' : 'find your beat'}
           </Text>
         )}
 
@@ -293,7 +289,7 @@ export default function StartScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#000',
+    flex: 1, backgroundColor: '#050810',
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32,
   },
@@ -367,7 +363,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     top: '60%',
     width: 200, height: 200, opacity: 0.94,
-    tintColor: '#6B0000',
+    tintColor: '#E53935',
   },
   skipBtn: {
     position: 'absolute', top: 52, right: 24,

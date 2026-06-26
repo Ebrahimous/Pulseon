@@ -45,10 +45,10 @@ export default function DeathScreen({ navigation }) {
   const isFlatline = deathCause === 'flatline';
   const isArrest   = deathCause === 'arrest';
   const causeColor = isFlatline ? '#4FC3F7' : '#FF1744';
-  const causeLabel = isFlatline ? 'FLATLINE' : isArrest ? 'CARDIAC ARREST' : 'STROKE';
-  const causeDesc  = isFlatline ? 'your heart stopped'
-                   : isArrest   ? 'your heart gave out'
-                   : 'you pushed too hard';
+  const causeLabel = isFlatline ? 'FLATLINED' : isArrest ? 'OVERDRIVE' : 'BURNED OUT';
+  const causeDesc  = isFlatline ? 'you lost the rhythm'
+                   : isArrest   ? 'you pushed too far'
+                   : 'you burned too bright';
 
   const grade      = calcGrade(survivalMs, bestCombo);
   const gradeColor = GRADE_COLOR[grade];
@@ -282,7 +282,7 @@ function Stat({ label, value, accent }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#000',
+    flex: 1, backgroundColor: '#050810',
     alignItems: 'center',
     paddingTop: 52, paddingBottom: 20, paddingHorizontal: 20,
   },

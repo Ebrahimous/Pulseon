@@ -132,6 +132,13 @@ export default function GameScreen({ navigation }) {
   const isPausedRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
 
+  // ── In-range edge glow ────────────────────────────────────────────────────
+  const inRangeGlow    = useRef(new Animated.Value(0)).current;
+  const inRangeGlowRef = useRef(null);
+
+  // ── Combo milestone flash ─────────────────────────────────────────────────
+  const milestoneFlash = useRef(new Animated.Value(0)).current;
+
   // ── Difficulty range announcement ────────────────────────────────────────
   const diffAnnounceOpacity = useRef(new Animated.Value(0)).current;
   const [diffAnnounceText, setDiffAnnounceText] = useState('');
@@ -284,6 +291,29 @@ export default function GameScreen({ navigation }) {
       Animated.timing(diffAnnounceOpacity, { toValue: 0,   duration: 500, useNativeDriver: true }),
     ]).start();
   }, [difficultyLevel]);
+
+  // ── In-range green edge glow ─────────────────────────────────────────────
+  useEffect(() => {
+    inRangeGlowRef.current?.stop();
+    if (inRange) {
+      inRangeGlowRef.current = Animated.loop(Animated.sequence([
+        Animated.timing(inRangeGlow, { toValue: 0.45, duration: 850, useNativeDriver: true }),
+        Animated.timing(inRangeGlow, { toValue: 0.12, duration: 850, useNativeDriver: true }),
+      ]));
+      inRangeGlowRef.current.start();
+    } else {
+      Animated.timing(inRangeGlow, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+    }
+    return () => inRangeGlowRef.current?.stop();
+  }, [inRange]);
+
+  // ── Combo milestone gold flash ────────────────────────────────────────────
+  useEffect(() => {
+    if (combo > 1 && combo % 5 === 0) {
+      milestoneFlash.setValue(0.75);
+      Animated.timing(milestoneFlash, { toValue: 0, duration: 700, useNativeDriver: true }).start();
+    }
+  }, [combo]);
 
   // ── Pause on tab-switch / app background ─────────────────────────────────
   useEffect(() => {
@@ -470,9 +500,9 @@ export default function GameScreen({ navigation }) {
   const scoreGlowSize  = isBeatingBest ? 18 : 8;
 
   const flatlineColor = deathCause === 'flatline' ? '#4FC3F7' : '#FF1744';
-  const flatlineLabel = deathCause === 'flatline' ? 'FLATLINE'
-                      : deathCause === 'arrest'   ? 'CARDIAC ARREST'
-                      : 'STROKE';
+  const flatlineLabel = deathCause === 'flatline' ? 'FLATLINED'
+                      : deathCause === 'arrest'   ? 'OVERDRIVE'
+                      : 'BURNED OUT';
 
   return (
     <View
@@ -485,6 +515,24 @@ export default function GameScreen({ navigation }) {
 
       {/* Scanlines */}
       <Scanlines width={width} height={height} />
+
+      {/* Zone colour background tint — breathes life into the background */}
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: accentColor, opacity: 0.06 }]}
+      />
+
+      {/* In-range green edge glow */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { borderWidth: 2, borderColor: '#69FF47', opacity: inRangeGlow }]}
+      />
+
+      {/* Combo milestone gold border flash */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { borderWidth: 3, borderColor: '#FFD700', opacity: milestoneFlash }]}
+      />
 
       {/* Back arrow — quit to start */}
       <TouchableOpacity
@@ -504,11 +552,11 @@ export default function GameScreen({ navigation }) {
         pointerEvents="none"
         style={{
           position: 'absolute',
-          width: 120, height: 120,
+          width: 100, height: 100,
           right: 20,
-          top:   44,
+          top:   4,
           opacity: 1.0,
-          tintColor: '#6B0000',
+          tintColor: '#E53935',
           transform: [{ scale: heartPulse }],
         }}
         resizeMode="contain"
@@ -819,7 +867,7 @@ function getBpmColor(bpm, low, high) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: '#050810' },
 
   scoreArea: {
     position: 'absolute', top: 36, alignSelf: 'center',

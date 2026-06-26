@@ -25,12 +25,12 @@ export default function HowToPlayScreen({ navigation }) {
           body={"Tap the screen to raise your BPM. Stop tapping and it falls. Keep it between 65–85 BPM to stay in the safe zone."}
         />
         <Rule
-          title="STROKE"
-          body={"Your BPM climbs too high and stays there — your heart gives out. Slow down."}
+          title="BURNED OUT"
+          body={"Your BPM climbs too high and stays there. You pushed too far — slow down before you burn out."}
         />
         <Rule
-          title="FLATLINE"
-          body={"Your BPM drops too low for too long — your heart stops. Keep tapping."}
+          title="FLATLINED"
+          body={"Your BPM drops too low for too long. You lost the rhythm — keep tapping to stay alive."}
         />
         <Rule
           title="RINGS"
@@ -51,7 +51,7 @@ export default function HowToPlayScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#000',
+    flex: 1, backgroundColor: '#050810',
   },
   backBtn: {
     position: 'absolute', top: 52, left: 24, zIndex: 10,
