@@ -311,6 +311,7 @@ export default function StartScreen({ navigation }) {
           <TouchableOpacity
             style={styles.lbBtn}
             onPress={() => navigation.navigate('Leaderboard')}
+            activeOpacity={0.6}
           >
             <Text style={styles.lbBtnText}>LEADERBOARD</Text>
           </TouchableOpacity>
@@ -437,12 +438,13 @@ const styles = StyleSheet.create({
     width: 72, textAlign: 'right',
   },
   lbBtn: {
-    position: 'absolute', bottom: 36,
-    left: 0, right: 0,
+    position: 'absolute', bottom: 40,
+    left: 24, right: 24,
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
+    borderWidth: 1, borderColor: '#1c1c1c', borderRadius: 2,
   },
   lbBtnText: {
-    color: '#1e1e1e', fontSize: 9, letterSpacing: 5,
+    color: '#666', fontSize: 10, letterSpacing: 5,
   },
 });
