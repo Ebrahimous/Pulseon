@@ -8,7 +8,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from '../utils/haptics';
 import { playHeartbeat, playFlatline, playHit, playWhoosh } from '../utils/sound';
 import {
-  useGameStore, PHASE,
+  useGameStore, PHASE, DIFFICULTY_INTERVAL_MS,
 } from '../store/gameStore';
 import { createBpmEngine } from '../engine/bpmEngine';
 import { checkAllRings } from '../engine/collision';
@@ -66,7 +66,7 @@ export default function GameScreen({ navigation }) {
   const {
     phase, displayBpm, rings, playerX, playerY, accentColor, zone,
     ecgHistory, strokeAccumMs, flatlineAccumMs,
-    currentBpmLow, currentBpmHigh, spawnCount,
+    currentBpmLow, currentBpmHigh, spawnCount, difficultyAccumMs,
     score, bestScore, combo, bestCombo, deathCause, difficultyLevel,
     registerTap, tickAll, startGame, setPlayerPosition,
   } = useGameStore();
@@ -677,19 +677,26 @@ export default function GameScreen({ navigation }) {
               const progress = dir > 0
                 ? ring.radius / ring.maxRadius
                 : 1 - ring.radius / ring.maxRadius;
-              const baseOpacity = Math.max(0.03, 0.5 * (1 - progress * 0.85));
-              const opacity  = baseOpacity * (ring.spawnOpacity ?? 1);
-              const strokeW  = Math.max(0.8, 2.0 * (1 - progress * 0.7));
-              const color    = RING_COLOR[ring.type] ?? accentColor;
+              const baseOpacity  = Math.max(0.03, 0.5 * (1 - progress * 0.85));
+              const opacity      = baseOpacity * (ring.spawnOpacity ?? 1);
+              const baseStrokeW  = Math.max(0.8, 2.0 * (1 - progress * 0.7));
+              const color        = RING_COLOR[ring.type] ?? accentColor;
+
+              // Danger proximity — ring thickens and reddens as it closes in on the player dot
+              const edgeDist    = Math.abs(Math.hypot(playerX - ring.originX, playerY - ring.originY) - ring.radius);
+              const dangerFactor = edgeDist < 60 ? Math.max(0, 1 - edgeDist / 60) : 0;
+              const strokeW      = baseStrokeW + dangerFactor * 2.5;
+              const strokeColor  = dangerFactor > 0.5 ? '#FF1744' : color;
+
               return (
                 <Circle
                   key={ring.id}
                   cx={ring.originX} cy={ring.originY}
                   r={Math.max(0, ring.radius)}
                   fill="none"
-                  stroke={color}
+                  stroke={strokeColor}
                   strokeWidth={strokeW}
-                  strokeOpacity={opacity}
+                  strokeOpacity={Math.min(1, opacity + dangerFactor * 0.35)}
                   strokeDasharray={ring.type === 'inward' ? '10 5' : undefined}
                 />
               );
@@ -756,6 +763,14 @@ export default function GameScreen({ navigation }) {
       <Text style={[styles.zoneLabel, { color: zone.color }]} pointerEvents="none">
         {zone.label.toUpperCase()}
       </Text>
+
+      {/* Difficulty countdown — thin bar at screen bottom; fills every 30s then resets on range-narrow */}
+      <View style={styles.diffCountdownTrack} pointerEvents="none">
+        <View style={[styles.diffCountdownFill, {
+          width: `${Math.min(100, (difficultyAccumMs / DIFFICULTY_INTERVAL_MS) * 100)}%`,
+          backgroundColor: accentColor,
+        }]} />
+      </View>
 
       {/* Near-miss flash */}
       <Animated.View
@@ -939,6 +954,14 @@ const styles = StyleSheet.create({
   backBtnText: {
     color: '#2a2a2a', fontSize: 20,
   },
+  diffCountdownTrack: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: 2, backgroundColor: '#0a0a0a',
+  },
+  diffCountdownFill: {
+    height: '100%', opacity: 0.4,
+  },
+
   pauseOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.75)',

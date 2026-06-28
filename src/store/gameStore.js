@@ -20,7 +20,7 @@ const STROKE_MS       = 5000;   // increased from 3 s — more time to correct a
 const GRACE_PERIOD_MS = 1500;
 
 // Difficulty escalation
-const DIFFICULTY_INTERVAL_MS = 30_000;
+export const DIFFICULTY_INTERVAL_MS = 30_000;
 const RANGE_NARROW_AMOUNT    = 2;
 const MIN_RANGE_LOW          = 72;
 const MIN_RANGE_HIGH         = 78;
@@ -157,7 +157,7 @@ export const useGameStore = create((set, get) => ({
     const zone = getZoneForBpm(newBpm);
 
     set((s) => {
-      const newScore     = s.score + s.combo;  // each tap = 1 × current combo
+      const newScore     = s.score + Math.round(s.combo * zone.scoreMultiplier);  // zone multiplier rewards higher BPM
       const newBestScore = Math.max(s.bestScore, newScore);
       return {
         tapTimestamps:   newTaps,
@@ -437,40 +437,6 @@ export const useGameStore = create((set, get) => ({
         spawnOpacity: 0,   // fades 0→1 over first 300ms
       }],
     }));
-  },
-
-  // Advance all rings; award +combo for clean expiries
-  tickRings: (deltaMs) => {
-    const { rings } = get();
-    const dt = deltaMs / 16.67;
-
-    const updated = rings.map((r) => {
-      const dir  = r.dir ?? 1;
-      const newR = dir > 0
-        ? r.radius + r.speed * dt
-        : Math.max(0, r.radius - r.speed * dt);
-      const newOpacity = Math.min(1, (r.spawnOpacity ?? 1) + deltaMs / 300);
-      return { ...r, radius: newR, spawnOpacity: newOpacity };
-    });
-
-    const alive      = updated.filter((r) => (r.dir ?? 1) > 0 ? r.radius < r.maxRadius  : r.radius > 0);
-    const expired    = updated.filter((r) => (r.dir ?? 1) > 0 ? r.radius >= r.maxRadius : r.radius <= 0);
-    const cleanCount = expired.filter((r) => !r.wasHit).length;
-
-    if (cleanCount > 0) {
-      set((s) => ({
-        rings:       alive,
-        combo:       s.combo + cleanCount,
-        bestCombo:   Math.max(s.bestCombo, s.combo + cleanCount),
-        ringsDodged: s.ringsDodged + cleanCount,
-      }));
-    } else {
-      set({ rings: alive });
-    }
-  },
-
-  tickSurvival: (deltaMs) => {
-    set((s) => ({ survivalMs: s.survivalMs + deltaMs }));
   },
 
   resetGame: () => set({

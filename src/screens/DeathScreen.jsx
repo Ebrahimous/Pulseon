@@ -69,6 +69,24 @@ export default function DeathScreen({ navigation }) {
   const grade      = calcGrade(survivalMs, bestCombo);
   const gradeColor = GRADE_COLOR[grade];
 
+  // ── New best glow — pulses gold on the name input when this run beats the record ──
+  const isNewBest   = bestScore > 10 && score >= bestScore;
+  const newBestGlow = useRef(new Animated.Value(0)).current;
+  const newBestLoop = useRef(null);
+  useEffect(() => {
+    if (isNewBest && submitState === 'idle') {
+      newBestLoop.current = Animated.loop(Animated.sequence([
+        Animated.timing(newBestGlow, { toValue: 1,    duration: 650, useNativeDriver: false }),
+        Animated.timing(newBestGlow, { toValue: 0.15, duration: 650, useNativeDriver: false }),
+      ]));
+      newBestLoop.current.start();
+    } else {
+      newBestLoop.current?.stop();
+      newBestGlow.setValue(0);
+    }
+    return () => newBestLoop.current?.stop();
+  }, [isNewBest, submitState]);
+
   const handleSubmit = async () => {
     const trimmed = playerName.trim();
     if (!trimmed) return;
@@ -288,29 +306,46 @@ export default function DeathScreen({ navigation }) {
 
       {/* Leaderboard submit */}
       {submitState !== 'done' ? (
-        <View style={styles.submitRow}>
-          <TextInput
-            style={styles.nameInput}
-            placeholder="YOUR NAME"
-            placeholderTextColor="#333"
-            value={playerName}
-            onChangeText={setPlayerName}
-            maxLength={20}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit}
-            editable={submitState !== 'submitting'}
-          />
-          <TouchableOpacity
-            style={[styles.submitBtn, submitState === 'submitting' && { opacity: 0.5 }]}
-            onPress={handleSubmit}
-            disabled={submitState === 'submitting' || !playerName.trim()}
-          >
-            <Text style={styles.submitBtnText}>
-              {submitState === 'submitting' ? '...' : submitState === 'error' ? 'RETRY' : 'SUBMIT'}
-            </Text>
-          </TouchableOpacity>
+        <View style={{ width: '100%', marginBottom: 12 }}>
+          {isNewBest && submitState === 'idle' && (
+            <Animated.Text style={[styles.newBestPrompt, { opacity: newBestGlow }]}>
+              NEW BEST — ENTER YOUR NAME
+            </Animated.Text>
+          )}
+          <View style={styles.submitRow}>
+            <Animated.View style={[
+              styles.nameInputWrap,
+              isNewBest && submitState === 'idle' && {
+                borderColor: newBestGlow.interpolate({
+                  inputRange:  [0.15, 1],
+                  outputRange: ['#1a1a1a', '#FFD700'],
+                }),
+              },
+            ]}>
+              <TextInput
+                style={styles.nameInputField}
+                placeholder="YOUR NAME"
+                placeholderTextColor="#333"
+                value={playerName}
+                onChangeText={setPlayerName}
+                maxLength={20}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit}
+                editable={submitState !== 'submitting'}
+              />
+            </Animated.View>
+            <TouchableOpacity
+              style={[styles.submitBtn, submitState === 'submitting' && { opacity: 0.5 }]}
+              onPress={handleSubmit}
+              disabled={submitState === 'submitting' || !playerName.trim()}
+            >
+              <Text style={styles.submitBtnText}>
+                {submitState === 'submitting' ? '...' : submitState === 'error' ? 'RETRY' : 'SUBMIT'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <Text style={styles.submittedText}>POSTED TO LEADERBOARD ✓</Text>
@@ -395,12 +430,20 @@ const styles = StyleSheet.create({
   streakBest: {
     color: '#333', fontSize: 10, letterSpacing: 4,
   },
-  submitRow: {
-    flexDirection: 'row', width: '100%', marginBottom: 12, gap: 8,
+  newBestPrompt: {
+    color: '#FFD700', fontSize: 9, letterSpacing: 4,
+    marginBottom: 8, alignSelf: 'flex-start',
   },
-  nameInput: {
+  submitRow: {
+    flexDirection: 'row', width: '100%', gap: 8,
+  },
+  nameInputWrap: {
     flex: 1, height: 44,
     borderWidth: 1, borderColor: '#1a1a1a', borderRadius: 2,
+    overflow: 'hidden',
+  },
+  nameInputField: {
+    flex: 1, height: '100%',
     paddingHorizontal: 12,
     color: '#fff', fontSize: 12, letterSpacing: 3, fontWeight: '300',
     backgroundColor: '#080c14',

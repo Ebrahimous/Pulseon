@@ -1,5 +1,5 @@
 # Pulse — Project Handoff
-_Last updated: 2026-06-26_
+_Last updated: 2026-06-28_
 
 > **How to use this file:** Open a new session, upload this file, and say:
 > *"Read this handoff file and tell me what we're doing next."*
@@ -33,7 +33,15 @@ _Last updated: 2026-06-26_
 1. 🔴 Set Firestore security rules (currently open — do before sharing publicly)
 2. Feature #1 — Heart.png lives (small change, high visual impact)
 3. Feature #9 — PWA installability
-4. Fix `lowestBpm: 0` hardcode on DeathScreen (see §5)
+
+**Recently completed (June 28):**
+- Zone `scoreMultiplier` now applied in scoring — higher BPM zones award more per tap
+- `bestScore` now persists on web via `localStorage` fallback in `storage.js`
+- Ring danger proximity visual — rings thicken and turn red as they close within 60px of player dot
+- Difficulty countdown bar — thin accent-color strip at screen bottom fills over 30s then resets
+- Death screen: new best glow — pulsing gold border + "NEW BEST — ENTER YOUR NAME" label on name input when player beats their high score
+- Dead code removed: `tickRings` and `tickSurvival` from `gameStore.js`
+- `DIFFICULTY_INTERVAL_MS` now exported from `gameStore.js`
 
 ---
 
@@ -99,10 +107,11 @@ All game state in one store. Key fields:
 | `currentBpmLow/High` | number | Safe window; starts 65–85, narrows every 30s |
 | `ringSpeedMult` | number | Starts 1.0, increases by 0.15 per difficulty tick, caps at 2.5 |
 | `score / combo / bestScore / bestCombo` | number | `bestScore` persists via storage; NOT reset on `resetGame()` |
-| `ecgHistory[]` | array | `{ t, bpm }`, capped at 300 entries, used by ECG renderer |
+| `ecgHistory[]` | array | `{ t, bpm }`, capped at 300 entries, sampled at ~5 Hz in `tickAll`, used by ECG renderer |
+| `lastEcgMs` | number | Timestamp of last ECG sample (rate-limiter for ecgHistory) |
 | `runStreak / bestStreak` | number | Persisted; qualified runs are ≥15s |
 
-**`tickAll(deltaMs)`** — single `set()` call per frame batching: rings advance + expiry + combo award, survival time, flatline check, stroke check, difficulty escalation, BPM decay. One Zustand notification = one React re-render per frame.
+**`tickAll(deltaMs)`** — single `set()` call per frame batching: rings advance + expiry + combo award, survival time, flatline check, stroke check, difficulty escalation, BPM decay, ECG history sampling. One Zustand notification = one React re-render per frame.
 
 **`resetGame()`** intentionally does NOT reset `bestScore`, `runStreak`, `bestStreak`.
 
@@ -133,7 +142,7 @@ Rings fade in over 300ms via `spawnOpacity` (0→1).
 ### Two parallel systems in GameScreen
 
 1. **`bpmEngine`** (setInterval at player's BPM) — spawns rings; reschedules when BPM shifts ≥2. Ref: `engineRef.current`. Progressive frequency: `freqMult = min(3.0, 1 + score/500)`.
-2. **rAF tick** (requestAnimationFrame loop) — calls `tickAll`, cleans ripples/floats, runs collision, checks phase. Paused via `isPausedRef` (no-ops rAF) + `engineRef.current.stop()` on tab-hide/app-background.
+2. **rAF tick** (requestAnimationFrame loop) — calls `tickAll`, cleans ripples/floats (only re-renders when a ripple actually expires — same ref returned otherwise), runs collision, checks phase. Paused via `isPausedRef` (no-ops rAF) + `engineRef.current.stop()` on tab-hide/app-background.
 
 ### Collision (`collision.js`)
 
@@ -181,16 +190,11 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 ## 3. Exact Next Steps
 
-**1. (Fastest / highest impact) Fix `lowestBpm: 0` on DeathScreen**
-- Open `src/screens/DeathScreen.jsx`, line ~92
-- Change `lowestBpm: 0` → `lowestBpm` from the store (already destructured in the component as `const { ..., peakBpm, ... } = useGameStore()` — add `lowestBpm` there)
-- This fixes the ECG stats line which always says "0 BPM low"
-
-**2. 🔴 Set Firestore security rules**
+**1. 🔴 Set Firestore security rules**
 - Log in to Firebase Console, paste the rules from §2 above → Publish
 - Do this before sharing the game URL with anyone
 
-**3. Feature #1 — Replace ♥ text lives with Heart.png**
+**2. Feature #1 — Replace ♥ text lives with Heart.png**
 - In `GameScreen.jsx`, find the `livesRow` View (search for `livesRow` or `♥`)
 - Replace `Animated.Text` with `Animated.Image` for each heart slot:
   ```jsx
@@ -207,12 +211,12 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
   ```
 - The `heartScales` animations already work — no logic changes needed
 
-**4. Feature #9 — PWA installability**
+**3. Feature #9 — PWA installability**
 - In `app.json`, under `"expo"`, add: `"web": { "name": "Pulse", "shortName": "Pulse", "themeColor": "#050810", "backgroundColor": "#050810" }`
 - Expo auto-generates the manifest on `expo export --platform web`
 - Test in Chrome: deployed URL → address bar install icon
 
-**5. Feature #11 — Practice mode (replace SKIP)**
+**4. Feature #11 — Practice mode (replace SKIP)**
 - Add `practiceMode: false` to gameStore initial state; reset in `resetGame()`
 - SKIP button sets `practiceMode: true` before navigating to Game
 - In GameScreen: when `practiceMode === true`, disable death navigation + life loss, add "PRACTICE" watermark
@@ -221,7 +225,17 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 ## 4. Recent Changes & Decisions
 
-### June 26, 2026
+### June 26, 2026 (session 2)
+
+**Tap lag fix** (`gameStore.js`, `GameScreen.jsx`)
+- `ecgHistory` / `peakBpm` / `lowestBpm` moved out of `registerTap` (was spreading a 300-item array on every tap) → now sampled in `tickAll` at ~5 Hz via `lastEcgMs` rate-limiter
+- `setRipples` / `setFloats` in rAF tick now return the same array reference when nothing expired → eliminates 1–2 extra re-renders per frame while ripples are active
+- Added `lastEcgMs: 0` to initial state and `resetGame()`
+
+**`lowestBpm: 0` bug fixed** (`DeathScreen.jsx`)
+- `lowestBpm` now destructured from the store and passed to `generateEcgSvg()` instead of hardcoded `0`
+
+### June 26, 2026 (session 1)
 
 **Firebase leaderboard** (`firebase.js`, `leaderboard.js`)
 - Firebase v12 modular SDK (`firebase/app`, `firebase/firestore`)
@@ -263,17 +277,21 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 **🔴 Firestore security rules not set** — database is open write. Apply rules from §2 before going public.
 
-**🟡 `lowestBpm: 0` hardcode on DeathScreen** — `generateEcgSvg()` receives `lowestBpm: 0` (line ~92 of `DeathScreen.jsx`). The store tracks `lowestBpm` correctly — just pass it through.
-
-**🟡 `storage.js` uses `expo-file-system` — silently no-ops on web** — `FileSystem.documentDirectory` is null on web. `loadBestScore` and `savePersisted` silently fail on web (no local persistence across sessions on web). Fix: branch on `Platform.OS === 'web'` and use `localStorage` instead.
-
 **🟡 Flatline/whoosh sounds may be blocked on iOS Safari** — Web Audio API requires a user-gesture-unlocked AudioContext. `playFlatline` fires on death inside rAF, not directly from a tap. Workaround: unlock a shared `AudioContext` singleton on the first tap event, then reuse it in all synth sound functions.
 
-**🟡 `tickRings` and `tickSurvival` in `gameStore.js` are dead code** — With `tickAll`, these functions (lines ~430–460) are no longer called. Safe to remove to reduce confusion.
+**🟢 `storage.js` web persistence** — ✅ Fixed. `localStorage` fallback added for web; `bestScore`, `runStreak`, `bestStreak` now persist on web.
+
+**🟢 `tickRings` / `tickSurvival` dead code** — ✅ Removed.
 
 **🟢 No score deduplication in Firestore** — Players can submit multiple times; each creates a new document. Low priority unless spam becomes a problem.
 
 **🟢 No known functional regressions.** Game is live and playable.
+
+---
+
+## 6. Future Ideas (parked)
+
+**Multiplayer shadow mode** — Two players tap simultaneously on the same device; two BPM lines (different colors) on the live ECG graph, shared ring field. No backend needed — second tap tracker is a `useRef` alongside the existing one.
 
 ---
 
