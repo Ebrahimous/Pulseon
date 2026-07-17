@@ -8,16 +8,31 @@
 import { Audio } from 'expo-av';
 
 // ── Web Audio helpers ─────────────────────────────────────────────────────────
-function makeCtx() {
-  try {
-    const Ctx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
-    return Ctx ? new Ctx() : null;
-  } catch { return null; }
+// Singleton AudioContext: Chrome caps ~6 contexts per page, and each `new Ctx()`
+// call was never closed — after a handful of near-misses every synth sound
+// silently failed, including the death flatline. One shared, resumed context
+// fixes that and lets `unlockAudio()` unlock it from a user gesture on iOS.
+let _ctx = null;
+function getCtx() {
+  if (typeof window === 'undefined') return null;
+  if (!_ctx) {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      _ctx = Ctx ? new Ctx() : null;
+    } catch { _ctx = null; }
+  }
+  if (_ctx && _ctx.state !== 'running') _ctx.resume().catch(() => {});
+  return _ctx;
+}
+
+/** Call from a user-gesture handler (tap) to unlock/resume the shared AudioContext on iOS Safari. */
+export function unlockAudio() {
+  getCtx();
 }
 
 /** Continuous 1 kHz sine tone — played when the player dies (flatline). */
 export function playFlatline() {
-  const ctx = makeCtx();
+  const ctx = getCtx();
   if (!ctx) return;
   try {
     const osc  = ctx.createOscillator();
@@ -35,7 +50,7 @@ export function playFlatline() {
 
 /** Quick frequency sweep — played when a ring just barely misses the dot. */
 export function playWhoosh() {
-  const ctx = makeCtx();
+  const ctx = getCtx();
   if (!ctx) return;
   try {
     const osc  = ctx.createOscillator();
@@ -54,7 +69,7 @@ export function playWhoosh() {
 
 /** Short low sawtooth thud — played when a ring hits the dot. */
 export function playHit() {
-  const ctx = makeCtx();
+  const ctx = getCtx();
   if (!ctx) return;
   try {
     const osc  = ctx.createOscillator();

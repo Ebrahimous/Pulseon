@@ -6,9 +6,9 @@ import Svg, {
 } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from '../utils/haptics';
-import { playHeartbeat, playFlatline, playHit, playWhoosh } from '../utils/sound';
+import { playHeartbeat, playFlatline, playHit, playWhoosh, unlockAudio } from '../utils/sound';
 import {
-  useGameStore, PHASE, DIFFICULTY_INTERVAL_MS,
+  useGameStore, PHASE, DIFFICULTY_INTERVAL_MS, STROKE_MS, FLATLINE_MS,
 } from '../store/gameStore';
 import { createBpmEngine } from '../engine/bpmEngine';
 import { checkAllRings } from '../engine/collision';
@@ -29,7 +29,7 @@ const NEAR_MISS_COOLDOWN_MS = 600; // throttle adrenaline spikes
 const GRAPH_H       = 72;
 const GRAPH_PAD_V   = 8;
 const GRAPH_BPM_MIN = 40;
-const GRAPH_BPM_MAX = 120;
+const GRAPH_BPM_MAX = 170;
 const LABEL_W       = 44;
 
 // Ring type colours
@@ -151,23 +151,34 @@ export default function GameScreen({ navigation }) {
   const flatlineAnim   = useRef(new Animated.Value(0)).current;
   const deathTriggered = useRef(false);
 
+  // ── Dims via ref — engine reads current dims without recreating on resize ──
+  const dimsRef = useRef({ width, height });
+  useEffect(() => { dimsRef.current = { width, height }; }, [width, height]);
+
   // ── Init player position ─────────────────────────────────────────────────
+  // Guarded to the pre-run moment only — a mid-run resize (rotation, mobile
+  // URL-bar collapse) must not teleport the player.
   useEffect(() => {
-    setPlayerPosition(width / 2, height / 2);
+    if (useGameStore.getState().survivalMs === 0) {
+      setPlayerPosition(width / 2, height / 2);
+    }
   }, [width, height]);
 
   // ── BPM Engine ───────────────────────────────────────────────────────────
+  // Mount-once: previously deps were [width, height], so any container resize
+  // recreated the engine and re-ran startGame(), resetting gameStartMs/grace/
+  // flatline mid-run. Dims now come from dimsRef instead of the closure.
   const engineRef = useRef(null);
   useEffect(() => {
     const engine = createBpmEngine({
       getStore: useGameStore.getState,
-      screenWidth: width, screenHeight: height,
+      getDims:  () => dimsRef.current,
     });
     engineRef.current = engine;
     engine.start();
     startGame();
     return () => engine.stop();
-  }, [width, height]);
+  }, []);
 
   useEffect(() => {
     engineRef.current?.updateBpm(displayBpm);
@@ -329,8 +340,10 @@ export default function GameScreen({ navigation }) {
     };
     const doResume = () => {
       if (!isPausedRef.current) return;
-      // Reset lastTapMs so the flatline timer doesn't punish them for leaving
-      useGameStore.setState({ lastTapMs: Date.now() });
+      // Reset lastTapMs, flatlineAccumMs, and strokeAccumMs so a paused player
+      // isn't punished on return: flatline/stroke run on the Accum fields, which
+      // survive a pause on their own (lastTapMs alone only gates BPM decay).
+      useGameStore.setState({ lastTapMs: Date.now(), flatlineAccumMs: 0, strokeAccumMs: 0 });
       engineRef.current?.start();
       isPausedRef.current = false;
       setIsPaused(false);
@@ -448,6 +461,7 @@ export default function GameScreen({ navigation }) {
   const tapGesture = Gesture.Pan()
     .runOnJS(true)
     .onBegin((e) => {
+      unlockAudio();
       playHeartbeat();
       registerTap(e.x, e.y);
 
@@ -488,9 +502,9 @@ export default function GameScreen({ navigation }) {
 
   const vignetteColor   = strokeWarn   ? '#FF1744' : flatlineWarn ? '#1A6688' : '#000000';
   const vignetteOpacity = strokeWarn
-    ? 0.25 + (strokeAccumMs   / 3000) * 0.55
+    ? Math.min(0.8, 0.25 + (strokeAccumMs / STROKE_MS) * 0.55)
     : flatlineWarn
-      ? 0.2  + ((flatlineAccumMs - FLATLINE_WARN_MS) / (3200 - FLATLINE_WARN_MS)) * 0.5
+      ? 0.2 + ((flatlineAccumMs - FLATLINE_WARN_MS) / (FLATLINE_MS - FLATLINE_WARN_MS)) * 0.5
       : 0.25;
 
   const comboColor = isRecord ? '#FFA726' : accentColor;
@@ -541,7 +555,13 @@ export default function GameScreen({ navigation }) {
         style={styles.backBtn}
         onPress={() => {
           engineRef.current?.stop();
-          useGameStore.getState().resetGame();
+          // Persist bestScore/streak on quit too — previously only the death
+          // path saved, so beating a best and quitting via back arrow lost it.
+          // Deliberately skip recordRunResult: an abandoned run should neither
+          // extend nor break the streak.
+          const s = useGameStore.getState();
+          savePersisted({ bestScore: s.bestScore, ...s.getStreakData() }).catch(() => {});
+          s.resetGame();
           navigation.replace('Start');
         }}
       >
@@ -846,7 +866,7 @@ export default function GameScreen({ navigation }) {
 
 // ── BPM Graph ─────────────────────────────────────────────────────────────────
 function bpmToY(bpm) {
-  const norm = (bpm - GRAPH_BPM_MIN) / (GRAPH_BPM_MAX - GRAPH_BPM_MIN);
+  const norm = Math.min(1, Math.max(0, (bpm - GRAPH_BPM_MIN) / (GRAPH_BPM_MAX - GRAPH_BPM_MIN)));
   return GRAPH_H - GRAPH_PAD_V - norm * (GRAPH_H - GRAPH_PAD_V * 2);
 }
 

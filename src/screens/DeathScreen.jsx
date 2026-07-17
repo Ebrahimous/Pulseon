@@ -107,7 +107,7 @@ export default function DeathScreen({ navigation }) {
     ecgHistory, score, deathCause,
     zoneName: zone.label,
     peakBpm, lowestBpm, survivalMs,
-  }), [ecgHistory, score, deathCause, zone, peakBpm, survivalMs]);
+  }), [ecgHistory, score, deathCause, zone, peakBpm, lowestBpm, survivalMs]);
 
   const survivalSec   = Math.floor(survivalMs / 1000);
   const minutes       = Math.floor(survivalSec / 60);

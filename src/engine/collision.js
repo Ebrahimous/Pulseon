@@ -50,6 +50,7 @@ export function checkAllRings(rings, px, py) {
   const nearMissIds = [];
 
   for (const ring of rings) {
+    if (ring.wasHit) continue; // already cost a life — skip until it expires (prevents re-hit + whoosh spam once the 1s invincibility lapses)
     const result = checkRingCollision(ring, px, py);
     if (result.hit) {
       hit = true;

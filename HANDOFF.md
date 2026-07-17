@@ -1,5 +1,5 @@
 # Pulse — Project Handoff
-_Last updated: 2026-06-28_
+_Last updated: 2026-07-16_
 
 > **How to use this file:** Open a new session, upload this file, and say:
 > *"Read this handoff file and tell me what we're doing next."*
@@ -34,15 +34,6 @@ _Last updated: 2026-06-28_
 2. Feature #1 — Heart.png lives (small change, high visual impact)
 3. Feature #9 — PWA installability
 
-**Recently completed (June 28):**
-- Zone `scoreMultiplier` now applied in scoring — higher BPM zones award more per tap
-- `bestScore` now persists on web via `localStorage` fallback in `storage.js`
-- Ring danger proximity visual — rings thicken and turn red as they close within 60px of player dot
-- Difficulty countdown bar — thin accent-color strip at screen bottom fills over 30s then resets
-- Death screen: new best glow — pulsing gold border + "NEW BEST — ENTER YOUR NAME" label on name input when player beats their high score
-- Dead code removed: `tickRings` and `tickSurvival` from `gameStore.js`
-- `DIFFICULTY_INTERVAL_MS` now exported from `gameStore.js`
-
 ---
 
 ## 2. The "Mental Model" & Architecture
@@ -68,7 +59,7 @@ Pulse on/
 │   └── HeartBeat.wav          ← plays on every tap (expo-av singleton)
 ├── src/
 │   ├── screens/
-│   │   ├── StartScreen.jsx        ← BPM gate; shows inline top-5 + RANKINGS button
+│   │   ├── StartScreen.jsx        ← BPM gate; RANKINGS button (navigates to LeaderboardScreen)
 │   │   ├── GameScreen.jsx         ← Entire game: rAF loop + bpmEngine + all animations
 │   │   ├── DeathScreen.jsx        ← Post-run stats, ECG waveform, leaderboard submit, share
 │   │   ├── LeaderboardScreen.jsx  ← Full top-10 (rank, name, grade, time, score)
@@ -223,9 +214,263 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 ---
 
+## 3.5 Bug-Fix Spec — code review 2026-07-16
+
+Nine issues from a full code review (store, engines, screens, utils). Fix order: **1–4 gameplay-critical, 5–8 polish, 9 batch of minors.** Each entry: location → fix → edge cases → acceptance checks. Remember the project editing rule: Python `content.replace(old, new, 1)` with `assert old in content` — no raw Edit/Write for these.
+
+---
+
+### FIX 1 — AudioContext leak kills all synth sounds mid-run 🔴
+
+**Files:** `src/utils/sound.js` (`makeCtx`, `playFlatline`, `playWhoosh`, `playHit`), `src/screens/StartScreen.jsx` (`handleTap`), `src/screens/GameScreen.jsx` (`tapGesture.onBegin`)
+
+**Problem:** `makeCtx()` creates a **new** `AudioContext` per sound call and never closes it. Chrome caps ~6 contexts per page → after a few near-misses every synth sound silently fails, including the death flatline. Also the root cause of the known iOS-Safari issue (§5): the flatline ctx is created outside a user gesture.
+
+**Fix:**
+1. Replace `makeCtx()` with a module-level singleton:
+   ```js
+   let _ctx = null;
+   function getCtx() {
+     if (typeof window === 'undefined') return null;
+     if (!_ctx) {
+       try {
+         const Ctx = window.AudioContext || window.webkitAudioContext;
+         _ctx = Ctx ? new Ctx() : null;
+       } catch { _ctx = null; }
+     }
+     if (_ctx && _ctx.state !== 'running') _ctx.resume().catch(() => {});
+     return _ctx;
+   }
+   export function unlockAudio() { getCtx(); }
+   ```
+2. `playFlatline` / `playWhoosh` / `playHit`: `const ctx = getCtx();` — never call `ctx.close()`.
+3. Call `unlockAudio()` at the top of StartScreen `handleTap` and GameScreen `tapGesture.onBegin` (both are user gestures → unlocks iOS).
+
+**Edge cases:**
+- `window` undefined (native) → `getCtx()` returns null, synths no-op (current behavior preserved).
+- iOS `state === 'interrupted'` (call/Siri) → the `resume()` in `getCtx` covers it. `resume()` returns a promise — swallow rejection, do **not** await it before playing; scheduling nodes on a resuming ctx is fine.
+- Multiple simultaneous sounds share the ctx — safe, oscillator/gain nodes are per-call.
+
+**Acceptance:**
+1. Chrome: trigger 10+ near-misses in one run → whoosh audible on every one (pre-fix it dies after ~6).
+2. Die after a sound-heavy run → flatline tone audible.
+3. Temp `console.count('ctx-created')` next to `new Ctx()` → exactly 1 per page load.
+4. iOS Safari: tap StartScreen once, then near-miss + death → both sounds audible.
+
+---
+
+### FIX 2 — Inward ring can hit invisibly on its first frame 🔴
+
+**File:** `src/store/gameStore.js` (`spawnRing`)
+
+**Problem:** the retry loop only enforces `dist(origin, player) >= MIN_DIST`. Inward rings spawn at `radius = maxRadius` (~558 px on 390×844), so a player sitting ~558 px from the origin is standing **on the ring edge at spawn** — while `spawnOpacity` is still 0. Invisible, unavoidable hit.
+
+**Fix:** compute `dist` inside the loop and extend the retry condition for inward rings:
+```js
+let dist = 0;
+do {
+  // ...existing edge-pick switch...
+  dist = Math.hypot(originX - playerX, originY - playerY);
+  attempts++;
+} while (
+  attempts < 12 &&
+  (dist < MIN_DIST || (dir === -1 && Math.abs(dist - startRadius) < 60))
+);
+// After the loop: if dir === -1 and still unsafe, skip the spawn entirely:
+if (dir === -1 && Math.abs(dist - startRadius) < 60) return;
+```
+A silently skipped spawn is invisible to the player; an unfair hit is not.
+
+**Edge cases:**
+- The unsafe annulus is a thin ~120 px band ~558 px from origin — retries almost always succeed; the skip path is rare.
+- Do **not** apply the annulus check to outward rings (`startRadius` 0 — `MIN_DIST` already covers them).
+- `playerX/playerY` can be a frame stale — the 60 px margin absorbs it (`HIT_THRESHOLD` is 14).
+
+**Acceptance:**
+1. Temp test: force `type = 'inward'`, player at center, call `spawnRing` 500× → every spawned ring satisfies `Math.abs(dist − startRadius) >= 60`.
+2. Playtest 5 runs → never lose a life in the same instant an orange ring appears.
+
+---
+
+### FIX 3 — Resume after pause doesn't reset the flatline timer 🔴
+
+**File:** `src/screens/GameScreen.jsx` (`doResume` inside the pause effect)
+
+**Problem:** the comment says resetting `lastTapMs` protects against flatline — but `lastTapMs` only gates BPM decay. Flatline runs on `flatlineAccumMs`, which survives the pause. Pause with 3000 ms accumulated → ~200 ms to live on return.
+
+**Fix:**
+```js
+useGameStore.setState({ lastTapMs: Date.now(), flatlineAccumMs: 0, strokeAccumMs: 0 });
+```
+Update the comment to match. Do **NOT** reset `gameStartMs` (grace period must not re-arm).
+
+**Edge cases:**
+- On web, react-native-web's `AppState` can fire alongside `visibilitychange` → `doResume` may run twice; guarded by `isPausedRef` and the double `setState` is idempotent — no change needed.
+- Resetting `strokeAccumMs` too is deliberate: BPM decay was frozen during pause, so the player resumes still above range with zero time to react otherwise.
+
+**Acceptance:**
+1. Stop tapping ~2.5 s → switch tab → return → keep not tapping → death arrives ~3.2 s after return (not instantly); KEEP TAPPING warning absent for the first ~1.8 s.
+2. Hold BPM above range ~4 s → tab away → return → STROKE RISK restarts from 0 (full 5 s to death).
+
+---
+
+### FIX 4 — Ring-spawn starvation from interval rescheduling 🔴
+
+**Files:** `src/engine/bpmEngine.js` (scheduling core), `src/screens/GameScreen.jsx` (`updateBpm` effect — unchanged, but now safe)
+
+**Problem:** `reschedule()` = `clearInterval` + fresh `setInterval` → next beat postponed by a **full** period. It fires from the `updateBpm` effect on nearly every tap (BPM jitter ≥2) **and** again inside `onBeat`. Sustained tapping = interval restarts constantly = rings starve.
+
+**Fix — phase-preserving setTimeout chain:**
+```js
+let timeoutId = null, lastBeatAt = 0, currentBpm = null, beatCount = 0;
+
+const clampBpm = (b) => Math.min(200, Math.max(30, b));
+
+function scheduleNext() {
+  const delay = Math.max(0, lastBeatAt + msPerBeat(clampBpm(currentBpm)) - Date.now());
+  timeoutId = setTimeout(onBeat, delay);
+}
+
+function onBeat() {
+  lastBeatAt = Date.now();
+  const store = getStore();
+  if (store.phase === 'playing') {
+    beatCount++;
+    // ...existing freqMult + spawnRing logic, DELETE the reschedule block...
+  }
+  currentBpm = getStore().displayBpm;  // pick up new tempo for the next beat
+  scheduleNext();                      // always — engine.stop() is what ends the chain
+}
+
+function updateBpm(newBpm) {
+  if (currentBpm !== null && Math.abs(newBpm - currentBpm) < BPM_RESCHEDULE_THRESHOLD) return;
+  currentBpm = newBpm;
+  clearTimeout(timeoutId);
+  scheduleNext();  // delay re-derived from lastBeatAt → beat phase preserved
+}
+
+function start() {
+  beatCount = 0;
+  currentBpm = getStore().displayBpm;
+  lastBeatAt = Date.now();
+  scheduleNext();
+}
+
+function stop() { clearTimeout(timeoutId); timeoutId = null; }
+```
+Delete `reschedule()` and the reschedule check at the end of the old `onBeat`. Keep bpmEngine and the rAF tick separate as before — this changes only the engine's internal clock.
+
+**Edge cases:**
+- `phase !== 'playing'`: still call `scheduleNext()` (chain must survive the 1-frame gap before `engineRef.current.stop()` runs on death/pause), just skip spawning.
+- `delay = 0` (BPM jumped up mid-beat) → one immediate beat, correct.
+- Resume after pause calls `start()` → `lastBeatAt = now` → no burst of catch-up beats.
+- Clamp BPM 30–200 before `msPerBeat` (guards ÷ weirdness).
+
+**Acceptance:**
+1. Temp `console.log(Date.now())` in `onBeat`; tap with natural jitter at ~100 BPM for 30 s → intervals ≈600 ms, max gap < 1.5× period (pre-fix: multi-second gaps).
+2. Rings keep spawning during a BPM ramp 75 → 130.
+3. Pause → resume → no beat burst, next spawn within ~1 period.
+
+---
+
+### FIX 5 — Stroke vignette uses stale 3000 ms constant 🟡
+
+**Files:** `src/store/gameStore.js` (add `export` to `STROKE_MS`, `FLATLINE_MS`), `src/screens/GameScreen.jsx` (vignette derivation)
+
+**Problem:** `vignetteOpacity` divides by literal `3000`, but `STROKE_MS` is 5000 → the ramp maxes out at 3 s and computes >1.0 for the last 2 s. The flatline branch hardcodes `3200`.
+
+**Fix:**
+```js
+const vignetteOpacity = strokeWarn
+  ? Math.min(0.8, 0.25 + (strokeAccumMs / STROKE_MS) * 0.55)
+  : flatlineWarn
+    ? 0.2 + ((flatlineAccumMs - FLATLINE_WARN_MS) / (FLATLINE_MS - FLATLINE_WARN_MS)) * 0.5
+    : 0.25;
+```
+
+**Acceptance:** vignette ramps continuously for the full 5 s to stroke death (no plateau at 3 s); `grep -n "3000\|3200" src/screens/GameScreen.jsx` → no timing literals remain.
+
+---
+
+### FIX 6 — BPM graph line vanishes above 120 BPM 🟡
+
+**File:** `src/screens/GameScreen.jsx` (`GRAPH_BPM_MAX`, `bpmToY`)
+
+**Problem:** graph scale is 40–120, zones go to 160. In Deep/Abyss/Void the polyline extrapolates above the strip and disappears — exactly when feedback matters most.
+
+**Fix:** `GRAPH_BPM_MAX = 170`, and clamp: `const norm = Math.min(1, Math.max(0, (bpm - GRAPH_BPM_MIN) / (GRAPH_BPM_MAX - GRAPH_BPM_MIN)));`
+
+**Edge cases:** the safe band (65–85) gets visually thinner on the wider scale — acceptable; the band Rect and both green Lines derive from `bpmToY` so they stay self-consistent.
+
+**Acceptance:** push into Void (140+) → line visible inside the strip; BPM near 40 → clamped at bottom edge, not clipped away.
+
+---
+
+### FIX 7 — Best score not persisted when quitting via back arrow 🟡
+
+**File:** `src/screens/GameScreen.jsx` (back-button `onPress`)
+
+**Problem:** `savePersisted` only runs on the death path. Beat your best → quit with ← → close tab = new best lost.
+
+**Fix:**
+```js
+onPress={() => {
+  engineRef.current?.stop();
+  const s = useGameStore.getState();
+  savePersisted({ bestScore: s.bestScore, ...s.getStreakData() }).catch(() => {});
+  s.resetGame();
+  navigation.replace('Start');
+}}
+```
+Deliberately do **NOT** call `recordRunResult` — an abandoned run neither extends nor breaks the streak.
+
+**Edge cases:** fire-and-forget is safe — web `localStorage` is synchronous; a native file write completing after unmount is harmless.
+
+**Acceptance:** beat best → quit via ← → hard-reload → BEST label shows the new value and `localStorage.pulse_save` contains it. Quit a 20 s run mid-streak → `runStreak` unchanged.
+
+---
+
+### FIX 8 — Mid-run resize/rotation resets run timers 🟡
+
+**Files:** `src/screens/GameScreen.jsx` (engine effect), `src/engine/bpmEngine.js` (signature)
+
+**Problem:** the engine effect deps are `[width, height]` — any container resize (rotation, mobile URL-bar collapse) recreates the engine **and re-runs `startGame()`**, resetting `gameStartMs`/grace/flatline mid-run.
+
+**Fix:** dims via ref, engine created once:
+```js
+const dimsRef = useRef({ width, height });
+useEffect(() => { dimsRef.current = { width, height }; }, [width, height]);
+
+useEffect(() => {
+  const engine = createBpmEngine({
+    getStore: useGameStore.getState,
+    getDims:  () => dimsRef.current,
+  });
+  engineRef.current = engine;
+  engine.start();
+  startGame();
+  return () => engine.stop();
+}, []);  // mount-once
+```
+In `bpmEngine.onBeat`: `const { width, height } = getDims(); store.spawnRing(width, height);` (replace the `screenWidth/screenHeight` params).
+
+**Edge cases:** first layout pass may briefly use `winW/winH` before `onLayout` resolves — same as today, harmless. The player-recenter effect on `[width, height]` may stay; optionally guard with `if (useGameStore.getState().survivalMs === 0)` to avoid teleporting mid-run.
+
+**Acceptance:** start a run, resize the browser window repeatedly → temp-log shows `gameStartMs` unchanged; spawn cadence doesn't double (no second engine); stop tapping right after a resize → flatline fires on the original schedule (grace didn't re-arm).
+
+---
+
+### FIX 9 — Minor batch 🟢
+
+1. **`src/screens/DeathScreen.jsx`** — `svgString` `useMemo` dep array is missing `lowestBpm`. Add it. *Acceptance:* exhaustive-deps lint quiet on that line.
+2. **`src/engine/collision.js`** — `checkAllRings` should skip already-hit rings: `if (ring.wasHit) continue;`. Prevents a slow ring from hitting again after the 1 s invincibility lapses, and stops whoosh spam from a ring that already cost a life. *Acceptance:* stand still in an inward ring's path → exactly one life lost per ring.
+3. **🔴 Firestore security rules (§2)** — unchanged, still the pre-share blocker. Console task, not code.
+
+---
+
 ## 4. Recent Changes & Decisions
 
-### June 26, 2026 (session 2)
+### June 28, 2026
 
 **Tap lag fix** (`gameStore.js`, `GameScreen.jsx`)
 - `ecgHistory` / `peakBpm` / `lowestBpm` moved out of `registerTap` (was spreading a 300-item array on every tap) → now sampled in `tickAll` at ~5 Hz via `lastEcgMs` rate-limiter
@@ -234,6 +479,25 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 **`lowestBpm: 0` bug fixed** (`DeathScreen.jsx`)
 - `lowestBpm` now destructured from the store and passed to `generateEcgSvg()` instead of hardcoded `0`
+
+**Scoring: zone multiplier applied** (`gameStore.js`)
+- Each tap now awards `combo × zone.scoreMultiplier` — higher BPM zones score more per tap
+
+**Web persistence fixed** (`storage.js`)
+- `bestScore`, `runStreak`, `bestStreak` now persist on web via `localStorage` fallback (previously silently no-opped on web)
+
+**Ring danger proximity visual** (`GameScreen.jsx`)
+- Rings thicken stroke width and shift toward red as they close within 60px of the player dot
+
+**Difficulty countdown bar** (`GameScreen.jsx`)
+- Thin accent-color strip at screen bottom fills over 30s (one difficulty tick) then resets
+
+**Death screen: new best glow** (`DeathScreen.jsx`)
+- Pulsing gold border + "NEW BEST — ENTER YOUR NAME" prompt on the name input when player beats their high score
+
+**Dead code removed** (`gameStore.js`)
+- `tickRings` and `tickSurvival` functions deleted (superseded by `tickAll`)
+- `DIFFICULTY_INTERVAL_MS` exported from `gameStore.js` for use in GameScreen countdown bar
 
 ### June 26, 2026 (session 1)
 
@@ -249,7 +513,7 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 **LeaderboardScreen** (new screen, added to App.js as `"Leaderboard"`)
 - Table: rank, name, grade (color-coded), time, score; REFRESH button; top-3 special styling
 
-**StartScreen** — RANKINGS button (centered, `top: 76`); inline top-5 display in idle state
+**StartScreen** — RANKINGS button navigates to LeaderboardScreen; inline top-5 removed (was cluttering the start screen)
 
 **deploy.bat reliability fixes**
 - `git config --global gc.auto 0` — suppresses GC (persists globally)
@@ -289,7 +553,7 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 
 ---
 
-## 6. Future Ideas (parked)
+## 7. Future Ideas (parked)
 
 **Multiplayer shadow mode** — Two players tap simultaneously on the same device; two BPM lines (different colors) on the live ECG graph, shared ring field. No backend needed — second tap tracker is a `useRef` alongside the existing one.
 
@@ -305,7 +569,7 @@ Apply at: console.firebase.google.com → pulseon-d9fee → Firestore → Rules
 | Audio | expo-av (heartbeat WAV) + Web Audio API (synth: flatline, hit, whoosh) |
 | Animations | React Native `Animated` + `react-native-svg` |
 | Gestures | `react-native-gesture-handler` (Gesture.Pan) |
-| Persistence | `expo-file-system` (native) / `localStorage` (web, name only) |
+| Persistence | `expo-file-system` (native) / `localStorage` (web — bestScore, runStreak, bestStreak, player name) |
 | Database | Firebase Firestore (`pulseon-d9fee`) |
 | Deployment | `deploy.bat` → GitHub push → Cloudflare Pages auto-build |
 | GitHub repo | https://github.com/Ebrahimous/Pulseon |

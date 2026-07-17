@@ -15,8 +15,8 @@ const BPM_RESTING      = 75;
 const BPM_DECAY_DELAY  = 600;
 
 // Death thresholds
-const FLATLINE_MS     = 3200;
-const STROKE_MS       = 5000;   // increased from 3 s — more time to correct an overshoot
+export const FLATLINE_MS = 3200;
+export const STROKE_MS   = 5000;   // increased from 3 s — more time to correct an overshoot
 const GRACE_PERIOD_MS = 1500;
 
 // Difficulty escalation
@@ -402,7 +402,7 @@ export const useGameStore = create((set, get) => ({
     const EDGE_OFFSET  = 40;
     const MIN_DIST     = 200 + ringSpeedMult * 60; // ~260px at base, ~350px at max difficulty
 
-    let originX = 0, originY = 0, attempts = 0;
+    let originX = 0, originY = 0, attempts = 0, dist = 0;
     do {
       const edge = Math.floor(Math.random() * 4);
       switch (edge) {
@@ -423,8 +423,18 @@ export const useGameStore = create((set, get) => ({
           originY = Math.random() * screenHeight;
           break;
       }
+      dist = Math.hypot(originX - playerX, originY - playerY);
       attempts++;
-    } while (attempts < 12 && Math.hypot(originX - playerX, originY - playerY) < MIN_DIST);
+    } while (
+      attempts < 12 &&
+      (dist < MIN_DIST || (dir === -1 && Math.abs(dist - startRadius) < 60))
+    );
+
+    // Inward rings spawn at radius = maxRadius (startRadius). If the player is
+    // standing right on that edge while spawnOpacity is still 0, the ring is
+    // invisible yet already touching them — an unfair hit. Skip the spawn
+    // instead; a silently skipped spawn is invisible to the player either way.
+    if (dir === -1 && Math.abs(dist - startRadius) < 60) return;
 
     set((s) => ({
       spawnCount: s.spawnCount + 1,

@@ -15,7 +15,7 @@ import {
   View, Text, TouchableWithoutFeedback, TouchableOpacity, StyleSheet, Animated, Image,
 } from 'react-native';
 import * as Haptics from '../utils/haptics';
-import { loadHeartbeat, playHeartbeat } from '../utils/sound';
+import { loadHeartbeat, playHeartbeat, unlockAudio } from '../utils/sound';
 import { useGameStore, PHASE, BPM_NORMAL_LOW, BPM_NORMAL_HIGH } from '../store/gameStore';
 
 const IN_RANGE_REQUIRED_MS = 3000;
@@ -90,6 +90,7 @@ export default function StartScreen({ navigation }) {
 
   const handleTap = useCallback((e) => {
     const now = Date.now();
+    unlockAudio();
     playHeartbeat();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     flashPulse();

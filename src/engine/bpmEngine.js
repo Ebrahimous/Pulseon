@@ -17,60 +17,68 @@ function spawnEveryN(bpm) {
   return Math.max(1, Math.ceil(3 - (bpm - 50) / 45));
 }
 
-export function createBpmEngine({ getStore, screenWidth, screenHeight, onBeat: onBeatCallback }) {
-  let intervalId = null;
+const clampBpm = (b) => Math.min(200, Math.max(30, b));
+
+// Phase-preserving scheduler: previously every BPM shift (≥2, which fires on
+// nearly every tap) did clearInterval + a fresh setInterval, postponing the
+// next beat by a full period. Sustained tapping restarted the interval
+// constantly and starved ring spawns. A setTimeout chain that always derives
+// its delay from the last beat's timestamp keeps beat phase continuous across
+// tempo changes.
+export function createBpmEngine({ getStore, getDims, onBeat: onBeatCallback }) {
+  let timeoutId  = null;
+  let lastBeatAt = 0;
   let currentBpm = null;
-  let beatCount = 0;
+  let beatCount  = 0;
 
   function msPerBeat(bpm) {
     return 60_000 / bpm;
   }
 
+  function scheduleNext() {
+    const delay = Math.max(0, lastBeatAt + msPerBeat(clampBpm(currentBpm)) - Date.now());
+    timeoutId = setTimeout(onBeat, delay);
+  }
+
   function onBeat() {
+    lastBeatAt = Date.now();
     const store = getStore();
     const { phase, displayBpm, score } = store;
-    if (phase !== 'playing') return;
 
-    beatCount++;
+    if (phase === 'playing') {
+      beatCount++;
 
-    // Progressive ring frequency: increases with score (caps at 3× base rate)
-    const freqMult     = Math.min(3.0, 1.0 + score / 500);
-    const beatsPerSpawn = Math.max(1, Math.round(spawnEveryN(displayBpm) / freqMult));
+      // Progressive ring frequency: increases with score (caps at 3× base rate)
+      const freqMult      = Math.min(3.0, 1.0 + score / 500);
+      const beatsPerSpawn  = Math.max(1, Math.round(spawnEveryN(displayBpm) / freqMult));
 
-    if (beatCount % beatsPerSpawn === 0) {
-      store.spawnRing(screenWidth, screenHeight);
+      if (beatCount % beatsPerSpawn === 0) {
+        const { width, height } = getDims();
+        store.spawnRing(width, height);
+      }
     }
 
-    // Reschedule if player BPM has shifted
-    const latestBpm = getStore().displayBpm;
-    if (Math.abs(latestBpm - currentBpm) >= BPM_RESCHEDULE_THRESHOLD) {
-      reschedule(latestBpm);
-    }
-  }
-
-  function reschedule(bpm) {
-    stop();
-    currentBpm = bpm;
-    intervalId = setInterval(onBeat, msPerBeat(bpm));
-  }
-
-  function start() {
-    beatCount = 0;
-    const { displayBpm } = getStore();
-    reschedule(displayBpm);
-  }
-
-  function stop() {
-    if (intervalId !== null) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
+    currentBpm = getStore().displayBpm; // pick up new tempo for the next beat
+    scheduleNext();                     // always — engine.stop() is what ends the chain
   }
 
   function updateBpm(newBpm) {
-    if (currentBpm === null || Math.abs(newBpm - currentBpm) >= BPM_RESCHEDULE_THRESHOLD) {
-      reschedule(newBpm);
-    }
+    if (currentBpm !== null && Math.abs(newBpm - currentBpm) < BPM_RESCHEDULE_THRESHOLD) return;
+    currentBpm = newBpm;
+    clearTimeout(timeoutId);
+    scheduleNext(); // delay re-derived from lastBeatAt → beat phase preserved
+  }
+
+  function start() {
+    beatCount  = 0;
+    currentBpm = getStore().displayBpm;
+    lastBeatAt = Date.now();
+    scheduleNext();
+  }
+
+  function stop() {
+    clearTimeout(timeoutId);
+    timeoutId = null;
   }
 
   return { start, stop, updateBpm };
